@@ -17,6 +17,13 @@ class InstanceState(IntEnum):
     STOPPED = 80
 
 
+def find_state_for_code(code: int) -> Optional[InstanceState]:
+    for state in InstanceState:
+        if state.value == code:
+            return state
+    return None
+
+
 @dataclass
 class InstanceInfo(types.IdentifiedResource):
     type: str
@@ -44,7 +51,7 @@ def gather(session: boto3.Session) -> Dict[str, InstanceInfo]:
                     i['InstanceId'],
                     types.parse_tags(i.get('Tags')),
                     i['InstanceType'],
-                    i['InstanceId'],
+                    find_state_for_code(i['State']['Code']),
                     i['ImageId'],
                     i['PrivateIpAddress'],
                     i.get('PublicIpAddress'),
