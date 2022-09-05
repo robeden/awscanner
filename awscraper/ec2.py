@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import Optional, Collection, Dict
 
-from awscraper import types
+from awscraper.util import IdentifiedResource, parse_tags
 
 
 class InstanceState(IntEnum):
@@ -25,7 +25,7 @@ def find_state_for_code(code: int) -> Optional[InstanceState]:
 
 
 @dataclass
-class InstanceInfo(types.IdentifiedResource):
+class InstanceInfo(IdentifiedResource):
     type: str
     state: InstanceState
     image_id: str
@@ -35,8 +35,9 @@ class InstanceInfo(types.IdentifiedResource):
     vpc_id: str
     arch: str
     reservation_id: str
-    volume_ids: Collection[str]
     launch_time: datetime.datetime
+    volume_ids: Collection[str]
+    security_group_ids: Collection[str]
 
 
 def gather(session: boto3.Session) -> Dict[str, InstanceInfo]:
@@ -49,7 +50,7 @@ def gather(session: boto3.Session) -> Dict[str, InstanceInfo]:
             for i in instances:
                 instance_map[i['InstanceId']] = InstanceInfo(
                     i['InstanceId'],
-                    types.parse_tags(i.get('Tags')),
+                    parse_tags(i.get('Tags')),
                     i['InstanceType'],
                     find_state_for_code(i['State']['Code']),
                     i['ImageId'],
@@ -59,7 +60,8 @@ def gather(session: boto3.Session) -> Dict[str, InstanceInfo]:
                     i['VpcId'],
                     i['Architecture'],
                     reservation['ReservationId'],
+                    i['LaunchTime'],
                     [bdm['VolumeId'] for bdm in i.get("Ebs", {}).get("BlockDeviceMappings", [])],
-                    i['LaunchTime']
+                    [sg['GroupId'] for sg in i["SecurityGroups"]]
                 )
     return instance_map

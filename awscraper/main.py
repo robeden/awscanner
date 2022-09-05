@@ -1,10 +1,9 @@
-import os
-from typing import List, Optional
+from typing import Optional
 
 import boto3
 from botocore.exceptions import ClientError
 
-from awscraper import ec2
+from awscraper import ec2, s3
 
 if __name__ == '__main__':
     session = boto3.Session(profile_name='548094779648_ps-p-account-admin')
@@ -49,7 +48,12 @@ if __name__ == '__main__':
         ec2_client = region_session.client("ec2")
         instance_map = ec2.gather(region_session)
 
-        print(f"{region}: instances={len(instance_map)}")
+        buckets = list(s3.gather(region_session))
+
+        print(f"{region}: instances={len(instance_map)}  buckets={len(buckets)}")
         if instance_map:
             for k, v in instance_map.items():
                 print(f"  {v}")
+        if buckets:
+            for bucket in buckets:
+                print(f"  {bucket}")
