@@ -6,10 +6,15 @@ import click
 
 from awscraper import ec2, s3
 
+from colorama import init, Fore
+
 
 @click.command()
 @click.option('--profile', required=True)
-def scan(profile: str):
+@click.option('--color', default=True)
+def scan(profile: str, color: bool):
+    init(autoreset=True, strip=not color)
+
     session = boto3.Session(profile_name=profile)
     sts_client = session.client("sts")
     caller = sts_client.get_caller_identity()
@@ -54,7 +59,7 @@ def scan(profile: str):
         print(f"{region}: instances={len(instance_map)}  buckets={len(buckets)}")
         if instance_map:
             for k, v in instance_map.items():
-                print(f"  {v}")
+                print(f"  {Fore.GREEN if v.is_running() else Fore.RED}{v}")
         if buckets:
             for bucket in buckets:
                 print(f"  {bucket}")

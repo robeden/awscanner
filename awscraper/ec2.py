@@ -39,6 +39,9 @@ class InstanceInfo(IdentifiedResource):
     volume_ids: Collection[str]
     security_group_ids: Collection[str]
 
+    def is_running(self):
+        return self.state in [InstanceState.RUNNING, InstanceState.PENDING]
+
 
 def gather(session: boto3.Session) -> Dict[str, InstanceInfo]:
     ec2_client = session.client("ec2")
