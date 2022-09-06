@@ -52,17 +52,17 @@ def scan(profile: str, color: bool):
 
         region_printed = False
         ec2_client = region_session.client("ec2")
-        instance_map = ec2.gather(region_session)
-
+        instances = list(ec2.gather_instances(region_session, ec2_client))
+        ebs_volumes = list(ec2.gather_ebs(region_session, ec2_client))
         buckets = list(s3.gather(region_session))
 
-        print(f"{region}: instances={len(instance_map)}  buckets={len(buckets)}")
-        if instance_map:
-            for k, v in instance_map.items():
-                print(f"  {Fore.GREEN if v.is_running() else Fore.RED}{v}")
-        if buckets:
-            for bucket in buckets:
-                print(f"  {bucket}")
+        print(f"{region}: instances={len(instances)}  buckets={len(buckets)}")
+        for i in instances:
+            print(f"  {Fore.GREEN if i.is_running() else Fore.RED}{i}")
+        for e in ebs_volumes:
+            print(f"  {Fore.GREEN if e.attached_instances else Fore.RED}{e}")
+        for bucket in buckets:
+            print(f"  {bucket}")
 
 
 if __name__ == '__main__':
