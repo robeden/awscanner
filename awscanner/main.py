@@ -10,8 +10,8 @@ from colorama import init, Fore
 
 
 @click.command()
-@click.option('--profile', required=True)
-@click.option('--color', default=True)
+@click.option('--profile', required=True, help="Credentials profile name.")
+@click.option('--color', default=True, help="Whether or not output coloring is enabled.")
 def scan(profile: str, color: bool):
     init(autoreset=True, strip=not color)
 

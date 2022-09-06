@@ -22,6 +22,8 @@ pip install -r requirements.txt
 python3 awscanner/main.py --profile MY_ACCOUNT_PROFILE_NAME
 ```
 
+Usage help is available via `--help`.
+
 ## Security
 
 Please report security issues to security -at- robeden -dot- com.
