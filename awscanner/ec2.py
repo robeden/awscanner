@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import Optional, Collection, Dict, Iterator
 
-from awscraper.util import IdentifiedResource, parse_tags
+from awscanner.util import IdentifiedResource, parse_tags
 
 
 class InstanceState(IntEnum):

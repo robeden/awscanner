@@ -4,7 +4,7 @@ from typing import Dict, List, Optional, Iterator, TypeVar, Callable
 import boto3 as boto3
 from botocore.exceptions import ClientError
 
-from awscraper.util import IdentifiedResource, parse_tags
+from awscanner.util import IdentifiedResource, parse_tags
 
 
 @dataclass

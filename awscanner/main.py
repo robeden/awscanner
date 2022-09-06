@@ -4,7 +4,7 @@ import boto3
 from botocore.exceptions import ClientError
 import click
 
-from awscraper import ec2, s3
+from awscanner import ec2, s3
 
 from colorama import init, Fore
 
@@ -20,7 +20,9 @@ def scan(profile: str, color: bool):
     caller = sts_client.get_caller_identity()
     print(f"Caller: user={caller.get('UserId')} account={caller.get('Account')} "
           f"arn={caller.get('Arn')}")
-    is_gov = caller.get('Arn').startswith('arn:aws-us-gov')
+    partition = caller.get('Arn').split(":")[1]         # aws, aws-cn, aws-us-gov, aws-iso, aws-iso-b
+    print(f"Partition: {partition}")
+    is_gov = partition == 'aws-us-gov'
 
     # Note: session.get_available_regions("ec2") includes regions which are not enabled
     test_region = "us-gov-east-1" if is_gov else "us-east-1"
@@ -29,8 +31,6 @@ def scan(profile: str, color: bool):
                if r["OptInStatus"] != "not-opted-in"]
     print(f"Regions: {regions}")
 
-    region_session = None
-    partition: Optional[str] = None   # aws, aws-cn, aws-us-gov, aws-iso, aws-iso-b
     for region in regions:
         # TODO: REMOVE!
         if not region.startswith("us-"):
@@ -46,11 +46,6 @@ def scan(profile: str, color: bool):
             print(f"Skipping region: {region}")
             continue
 
-        if partition is None:
-            partition = region_session.get_partition_for_region(region)
-            print(f"Partition: {partition}")
-
-        region_printed = False
         ec2_client = region_session.client("ec2")
         instances = list(ec2.gather_instances(region_session, ec2_client))
         ebs_volumes = list(ec2.gather_ebs(region_session, ec2_client))
