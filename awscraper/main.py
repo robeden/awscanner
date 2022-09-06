@@ -2,19 +2,20 @@ from typing import Optional
 
 import boto3
 from botocore.exceptions import ClientError
+import click
 
 from awscraper import ec2, s3
 
-if __name__ == '__main__':
-    session = boto3.Session(profile_name='548094779648_ps-p-account-admin')
+
+@click.command()
+@click.option('--profile', required=True)
+def scan(profile: str):
+    session = boto3.Session(profile_name=profile)
     sts_client = session.client("sts")
     caller = sts_client.get_caller_identity()
-    print(f"Caller: user={caller.get('UserId')} account={caller.get('Account')}")
-
-    # Note: session.get_available_regions("ec2") includes regions which are not enabled, so only
-    #       using this to get the region to jump from.
-    regions = session.get_available_regions("ec2")
-    is_gov = regions[0].startswith("us-gov")
+    print(f"Caller: user={caller.get('UserId')} account={caller.get('Account')} "
+          f"arn={caller.get('Arn')}")
+    is_gov = caller.get('Arn').startswith('arn:aws-us-gov')
 
     # Note: session.get_available_regions("ec2") includes regions which are not enabled
     test_region = "us-gov-east-1" if is_gov else "us-east-1"
@@ -27,10 +28,10 @@ if __name__ == '__main__':
     partition: Optional[str] = None   # aws, aws-cn, aws-us-gov, aws-iso, aws-iso-b
     for region in regions:
         # TODO: REMOVE!
-        if region != "us-east-1":
+        if not region.startswith("us-"):
             continue
 
-        region_session = boto3.Session(profile_name='548094779648_ps-p-account-admin', region_name=region)
+        region_session = boto3.Session(profile_name=profile, region_name=region)
 
         regional_sts = region_session.client("sts")
         # The point of this call is check if access to the region is enabled
@@ -57,3 +58,7 @@ if __name__ == '__main__':
         if buckets:
             for bucket in buckets:
                 print(f"  {bucket}")
+
+
+if __name__ == '__main__':
+    scan()
