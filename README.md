@@ -17,9 +17,7 @@ Currently, it is expected that session credentials are stored in
 for reference). 
 
 ```bash
-python3 -m venv ./venv && source venv/bin/activate
-pip install -r requirements.txt
-python3 awscanner/main.py --profile MY_ACCOUNT_PROFILE_NAME
+./gradlew run --args="--profile <account-profile-name>"
 ```
 
 Usage help is available via `--help`.
