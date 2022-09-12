@@ -14,4 +14,12 @@ public record EBSInfo(String id,
                       Integer iops,
                       Integer throughput,
                       String type) {
+
+    public boolean isAttached() {
+        return attached_instances.size() > 0;
+    }
+
+    public boolean isAttachedOrImage(Set<String> image_ids) {
+        return attached_instances.size() > 0 || image_ids.contains( snapshot_id );
+    }
 }

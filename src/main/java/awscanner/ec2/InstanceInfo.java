@@ -19,7 +19,7 @@ public record InstanceInfo(String id,
                            Set<String> volume_ids,
                            Set<String> security_group_ids) {
 
-	public boolean isRunning() {
-		return state == InstanceState.RUNNING || state == InstanceState.PENDING;
-	}
+    public boolean isRunning() {
+        return state == InstanceState.RUNNING || state == InstanceState.PENDING;
+    }
 }

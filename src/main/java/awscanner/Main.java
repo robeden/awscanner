@@ -3,6 +3,11 @@
  */
 package awscanner;
 
+import awscanner.ec2.EBSInfo;
+import awscanner.ec2.InstanceInfo;
+import com.diogonunes.jcolor.Ansi;
+import com.diogonunes.jcolor.AnsiFormat;
+import com.diogonunes.jcolor.Attribute;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -14,7 +19,6 @@ import software.amazon.awssdk.services.sts.StsClient;
 import software.amazon.awssdk.services.sts.model.GetCallerIdentityResponse;
 import software.amazon.awssdk.services.sts.model.StsException;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -24,85 +28,120 @@ import java.util.concurrent.Future;
 
 @Command( name = "checksum", mixinStandardHelpOptions = true )
 public class Main implements Callable<Integer> {
-	private static final Region[] STS_HUNT_REGIONS = { Region.US_EAST_1, Region.US_GOV_EAST_1 };
+    private static final Region[] STS_HUNT_REGIONS = { Region.US_EAST_1, Region.US_GOV_EAST_1 };
 
-	@Option( names = { "-p", "--profile" }, description = "Credential profile name",
-		required = true )
-	private String profile;
+    private static final AnsiFormat GREEN_TEXT = new AnsiFormat( Attribute.GREEN_TEXT() );
+    private static final AnsiFormat RED_TEXT = new AnsiFormat( Attribute.RED_TEXT() );
+    private static final AnsiFormat YELLOW_TEXT = new AnsiFormat( Attribute.YELLOW_TEXT() );
+
+    @Option( names = { "-p", "--profile" }, description = "Credential profile name",
+        required = true )
+    private String profile;
+
+    @Option( names = { "-c", "--color" }, type = Boolean.class,
+        negatable = true, defaultValue = "true",
+        description = "Enable or disable color console output" )
+    private boolean color_output;
 
 
-	@Override
-	public Integer call() throws Exception {
-		AwsCredentialsProvider cred_provider = ProfileCredentialsProvider.create( profile );
+    @Override
+    public Integer call() throws Exception {
+        AwsCredentialsProvider cred_provider = ProfileCredentialsProvider.create( profile );
 
-		GetCallerIdentityResponse response = huntForCallerIdentity( cred_provider );
-		System.out.printf( "Caller: user=%1$s account=%2$s arn=%3$s%n",
-			response.userId(), response.account(), response.arn() );
+        GetCallerIdentityResponse response = huntForCallerIdentity( cred_provider );
+        System.out.printf( "Caller: user=%1$s account=%2$s arn=%3$s%n",
+            response.userId(), response.account(), response.arn() );
 
-		String partition = response.arn().split( ":" )[ 1 ];
-		System.out.println( "Partition: " + partition );
+        String partition = response.arn().split( ":" )[ 1 ];
+        System.out.println( "Partition: " + partition );
 
-		ExecutorService executor = Executors.newWorkStealingPool();
+        ExecutorService executor = Executors.newWorkStealingPool();
 
-		List<Region> regions = loadRegions( partition.equals( "aws-us-gov" ), cred_provider );
+        List<Region> regions = loadRegions( partition.equals( "aws-us-gov" ), cred_provider );
 
-		List<Future<RegionInfo>> futures = regions.stream()
-			.map( r -> executor.submit( new RegionScanner( r, cred_provider, executor ) ) )
-			.toList();
+        List<Future<RegionInfo>> futures = regions.stream()
+            .map( r -> executor.submit(
+                new RegionScanner( r, cred_provider, executor, response.account() ) ) )
+            .toList();
 
 //		List<Future<RegionInfo>> futures = executor.invokeAll( regions.stream()
 //			.map( r -> new RegionScanner( r, cred_provider, executor ) )
 //			.toList() );
 
-		System.out.println( "Loading..." );
-		for ( Future<RegionInfo> future : futures ) {
-			RegionInfo region_info = future.get();
-			System.out.println(region_info);
+        System.out.println( "Loading..." );
+        for ( Future<RegionInfo> future : futures ) {
+            RegionInfo region_info = future.get();
+
+            println( region_info.region().id(), YELLOW_TEXT );
+
+            for ( InstanceInfo instance : region_info.instances().values() ) {
+                println( "  " + instance.toString(),
+                    instance.isRunning() ? GREEN_TEXT : RED_TEXT );
+            }
+            for ( EBSInfo ebs : region_info.ebs_volumes().values() ) {
+                AnsiFormat color = RED_TEXT;
+                if ( ebs.isAttached() ) {
+                    color = GREEN_TEXT;
+                }
+                else if ( region_info.snapshots().containsKey(ebs.snapshot_id() ) ||
+                    region_info.images().containsKey( ebs.id() ) ) {
+
+                    color = YELLOW_TEXT;
+                }
+                println( "  " + ebs, color );
+            }
+
+//            System.out.println( region_info );
 //			System.out.printf( "---- %1$s ----\n%2$s", region_info.region(), region_info );
-		}
+        }
 
-		return 0;
-	}
-
-
-	private List<Region> loadRegions( boolean is_gov, AwsCredentialsProvider cred_provider ) {
-		try ( Ec2Client client = Ec2Client.builder()
-			.region( is_gov ? Region.US_GOV_EAST_1 : Region.US_EAST_1 )
-			.credentialsProvider( cred_provider )
-			.build() ) {
-
-			return client.describeRegions().regions().stream()
-				.filter( r -> !r.optInStatus().equals( "not-opted-in" ) )
-				.map( r -> Region.of( r.regionName() ) )
-				.toList();
-		}
-	}
+        return 0;
+    }
 
 
-	/**
-	 * Loops through supported bootstrap regions to try to find the correct partition for STS connection.
-	 */
-	private GetCallerIdentityResponse huntForCallerIdentity( AwsCredentialsProvider cred_provider ) {
-		StsException last_exception = null;
-		for ( Region r : STS_HUNT_REGIONS ) {
-			try ( StsClient client = StsClient.builder()
-				.credentialsProvider( cred_provider )
-				.region( r )
-				.build() ) {
+    private List<Region> loadRegions( boolean is_gov, AwsCredentialsProvider cred_provider ) {
+        try ( Ec2Client client = Ec2Client.builder()
+            .region( is_gov ? Region.US_GOV_EAST_1 : Region.US_EAST_1 )
+            .credentialsProvider( cred_provider )
+            .build() ) {
 
-				return client.getCallerIdentity();
-			}
-			catch ( StsException ex ) {
-				last_exception = ex;
-			}
-		}
-		//noinspection ConstantConditions
-		throw last_exception;
-	}
+            return client.describeRegions().regions().stream()
+                .filter( r -> !r.optInStatus().equals( "not-opted-in" ) )
+                .map( r -> Region.of( r.regionName() ) )
+                .toList();
+        }
+    }
 
 
-	public static void main( String[] args ) {
-		int exitCode = new CommandLine( new Main() ).execute( args );
-		System.exit( exitCode );
-	}
+    /**
+     * Loops through supported bootstrap regions to try to find the correct partition for STS connection.
+     */
+    private GetCallerIdentityResponse huntForCallerIdentity( AwsCredentialsProvider cred_provider ) {
+        StsException last_exception = null;
+        for ( Region r : STS_HUNT_REGIONS ) {
+            try ( StsClient client = StsClient.builder()
+                .credentialsProvider( cred_provider )
+                .region( r )
+                .build() ) {
+
+                return client.getCallerIdentity();
+            }
+            catch ( StsException ex ) {
+                last_exception = ex;
+            }
+        }
+        //noinspection ConstantConditions
+        throw last_exception;
+    }
+
+
+    private void println( String text, AnsiFormat format ) {
+        System.out.println( color_output ? Ansi.colorize( text, format ) : text );
+    }
+
+
+    public static void main( String[] args ) {
+        int exitCode = new CommandLine( new Main() ).execute( args );
+        System.exit( exitCode );
+    }
 }

@@ -27,11 +27,11 @@ dependencies {
     implementation("software.amazon.awssdk:sns")
     implementation("software.amazon.awssdk:sts")
 
-    implementation("info.picocli:picocli:4.6.3")
+    implementation("info.picocli:picocli:4.6.3")        // CLI option parsing
+    implementation("com.diogonunes:JColor:5.5.1")       // Terminal colors
 
-    // Use JUnit Jupiter for testing.
+
     testImplementation("org.junit.jupiter:junit-jupiter:5.9.0")
-
 }
 
 application {
