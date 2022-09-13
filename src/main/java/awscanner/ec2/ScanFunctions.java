@@ -1,13 +1,11 @@
 package awscanner.ec2;
 
 import software.amazon.awssdk.services.ec2.Ec2Client;
-import software.amazon.awssdk.services.ec2.model.DescribeImagesRequest;
-import software.amazon.awssdk.services.ec2.model.GroupIdentifier;
-import software.amazon.awssdk.services.ec2.model.Tag;
-import software.amazon.awssdk.services.ec2.model.VolumeAttachment;
+import software.amazon.awssdk.services.ec2.model.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static java.util.function.Function.identity;
@@ -55,13 +53,18 @@ public class ScanFunctions {
     }
 
 
-    public static Map<String,SnapshotInfo> scanSnapshots( Ec2Client client ) {
-        return client.describeSnapshotsPaginator().stream()
+    public static Map<String,SnapshotInfo> scanSnapshots( String owner, Ec2Client client ) {
+        var request = DescribeSnapshotsRequest.builder()
+            .ownerIds( owner )
+            .build();
+        return client.describeSnapshotsPaginator( request ).stream()
             .flatMap( s -> s.snapshots().stream() )
             .map( s -> new SnapshotInfo(
                 s.snapshotId(),
                 ec2TagListToMap( s.tags() ),
                 s.volumeId(),
+                s.ownerId(),
+                s.ownerAlias(),
                 s.description(),
                 s.storageTierAsString()
             ) )
@@ -88,7 +91,12 @@ public class ScanFunctions {
                 i.tpmSupportAsString(),
                 i.bootModeAsString(),
                 i.stateAsString(),
-                i.publicLaunchPermissions()
+                i.publicLaunchPermissions(),
+                i.creationDate(),
+                i.blockDeviceMappings().stream()
+                    .map( bdm -> bdm.ebs().snapshotId() )
+                    .filter( Objects::nonNull )
+                    .collect( Collectors.toSet() )
             ) )
             .collect( Collectors.toUnmodifiableMap( ImageInfo::id, identity() ) );
     }

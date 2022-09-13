@@ -56,7 +56,7 @@ public class RegionScanner implements Callable<RegionInfo> {
         Future<Map<String,ImageInfo>> image_future =
             executor.submit( () -> scanImages( owner_id, ec2_client ) );
         Future<Map<String,SnapshotInfo>> snapshot_future =
-            executor.submit( () -> scanSnapshots( ec2_client ) );
+            executor.submit( () -> scanSnapshots( owner_id, ec2_client ) );
         Future<Map<String,EBSInfo>> volume_future =
             executor.submit( () -> scanVolumes( ec2_client ) );
 

@@ -26,6 +26,7 @@ dependencies {
     implementation("software.amazon.awssdk:s3")
     implementation("software.amazon.awssdk:sns")
     implementation("software.amazon.awssdk:sts")
+    runtimeOnly("software.amazon.awssdk:sso")           // Needed for SSO-based profiles
 
     implementation("info.picocli:picocli:4.6.3")        // CLI option parsing
     implementation("com.diogonunes:JColor:5.5.1")       // Terminal colors

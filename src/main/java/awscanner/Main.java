@@ -3,11 +3,11 @@
  */
 package awscanner;
 
+import awscanner.analyzers.UnusedAMIs;
 import awscanner.ec2.EBSInfo;
+import awscanner.ec2.ImageInfo;
 import awscanner.ec2.InstanceInfo;
-import com.diogonunes.jcolor.Ansi;
-import com.diogonunes.jcolor.AnsiFormat;
-import com.diogonunes.jcolor.Attribute;
+import awscanner.ec2.SnapshotInfo;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -20,19 +20,17 @@ import software.amazon.awssdk.services.sts.model.GetCallerIdentityResponse;
 import software.amazon.awssdk.services.sts.model.StsException;
 
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.stream.Collectors;
 
 
-@Command( name = "checksum", mixinStandardHelpOptions = true )
+@Command( name = "awscanner", mixinStandardHelpOptions = true )
 public class Main implements Callable<Integer> {
     private static final Region[] STS_HUNT_REGIONS = { Region.US_EAST_1, Region.US_GOV_EAST_1 };
-
-    private static final AnsiFormat GREEN_TEXT = new AnsiFormat( Attribute.GREEN_TEXT() );
-    private static final AnsiFormat RED_TEXT = new AnsiFormat( Attribute.RED_TEXT() );
-    private static final AnsiFormat YELLOW_TEXT = new AnsiFormat( Attribute.YELLOW_TEXT() );
 
     @Option( names = { "-p", "--profile" }, description = "Credential profile name",
         required = true )
@@ -46,6 +44,8 @@ public class Main implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
+        ColorWriter writer = ColorWriter.create( color_output );
+
         AwsCredentialsProvider cred_provider = ProfileCredentialsProvider.create( profile );
 
         GetCallerIdentityResponse response = huntForCallerIdentity( cred_provider );
@@ -72,26 +72,40 @@ public class Main implements Callable<Integer> {
         for ( Future<RegionInfo> future : futures ) {
             RegionInfo region_info = future.get();
 
-            println( region_info.region().id(), YELLOW_TEXT );
+            writer.println( region_info.region().id(), ColorWriter.BLUE );
 
             for ( InstanceInfo instance : region_info.instances().values() ) {
-                println( "  " + instance.toString(),
-                    instance.isRunning() ? GREEN_TEXT : RED_TEXT );
+                writer.println( "  " + instance.toString(),
+                    instance.isRunning() ? ColorWriter.GREEN : ColorWriter.RED );
             }
             for ( EBSInfo ebs : region_info.ebs_volumes().values() ) {
-                AnsiFormat color = RED_TEXT;
+                ColorWriter.Color color = ColorWriter.RED;
                 if ( ebs.isAttached() ) {
-                    color = GREEN_TEXT;
+                    color = ColorWriter.GREEN;
                 }
-                else if ( region_info.snapshots().containsKey(ebs.snapshot_id() ) ||
-                    region_info.images().containsKey( ebs.id() ) ) {
-
-                    color = YELLOW_TEXT;
+                else if ( ebs.snapshot_id() != null ) {
+                    if ( region_info.snapshots().containsKey( ebs.snapshot_id() ) ) {
+                        color = ColorWriter.YELLOW;
+                    }
                 }
-                println( "  " + ebs, color );
+                else if ( region_info.images().containsKey( ebs.id() ) ) {
+                    color = ColorWriter.YELLOW;
+                }
+                writer.println( "  " + ebs, color );
+            }
+            for ( SnapshotInfo snapshot : region_info.snapshots().values() ) {
+                ColorWriter.Color color = ColorWriter.NONE;
+                if ( snapshot.volume_id() == null ||
+                    !region_info.ebs_volumes().containsKey( snapshot.volume_id() ) ) {
+                    color = ColorWriter.Color.RED;
+                }
+                writer.println( "  " + snapshot, color );
             }
 
-//            System.out.println( region_info );
+            writer.println( "Unused AMIs:" );
+            UnusedAMIs.report( region_info, writer );
+
+//          System.out.println( region_info );
 //			System.out.printf( "---- %1$s ----\n%2$s", region_info.region(), region_info );
         }
 
@@ -132,11 +146,6 @@ public class Main implements Callable<Integer> {
         }
         //noinspection ConstantConditions
         throw last_exception;
-    }
-
-
-    private void println( String text, AnsiFormat format ) {
-        System.out.println( color_output ? Ansi.colorize( text, format ) : text );
     }
 
 
