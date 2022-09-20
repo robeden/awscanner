@@ -4,9 +4,14 @@ import awscanner.ec2.EBSInfo;
 import awscanner.ec2.ImageInfo;
 import awscanner.ec2.InstanceInfo;
 import awscanner.ec2.SnapshotInfo;
+import awscanner.price.PricingEstimation;
+import software.amazon.awssdk.auth.credentials.AnonymousCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.ec2.Ec2Client;
+import software.amazon.awssdk.services.pricing.PricingClient;
+import software.amazon.awssdk.services.pricing.model.*;
 import software.amazon.awssdk.services.rds.RdsClient;
 
 import java.util.Map;
@@ -21,13 +26,14 @@ import static awscanner.rds.ScanFunctions.scanRdsInstances;
 public class RegionScanner implements Callable<RegionInfo> {
     private final Region region;
     private final Ec2Client ec2_client;
+    private final PricingClient pricing_client;
     private final RdsClient rds_client;
     private final ExecutorService executor;
     private final String owner_id;
 
 
-    public RegionScanner( Region region, AwsCredentialsProvider creds, ExecutorService executor,
-        String owner_id ) {
+    public RegionScanner( Region region, AwsCredentialsProvider creds, AwsCredentialsProvider pricing_creds,
+        ExecutorService executor, String owner_id ) {
 
         this.region = region;
         this.owner_id = owner_id;
@@ -39,6 +45,13 @@ public class RegionScanner implements Callable<RegionInfo> {
             .region( region )
             .credentialsProvider( creds )
             .build();
+
+
+        pricing_client = PricingClient.builder()
+            .region( Region.US_EAST_1 )//region )
+            .credentialsProvider( pricing_creds )
+            .build();
+
         this.executor = executor;
     }
 
@@ -50,9 +63,11 @@ public class RegionScanner implements Callable<RegionInfo> {
 
 
     public RegionInfo scan( ExecutorService executor, String owner_id ) throws Exception {
+        PricingEstimation pricing = new PricingEstimation( executor, pricing_client );
+
         // EC2
         Future<Map<String,InstanceInfo>> instance_future =
-            executor.submit( () -> scanEc2Instances( ec2_client ) );
+            executor.submit( () -> scanEc2Instances( ec2_client, region.id(), pricing ) );
         Future<Map<String,ImageInfo>> image_future =
             executor.submit( () -> scanImages( owner_id, ec2_client ) );
         Future<Map<String,SnapshotInfo>> snapshot_future =

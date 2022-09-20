@@ -22,6 +22,7 @@ dependencies {
     implementation("software.amazon.awssdk:dynamodb")
     implementation("software.amazon.awssdk:ec2")
     implementation("software.amazon.awssdk:lambda")
+    implementation("software.amazon.awssdk:pricing")
     implementation("software.amazon.awssdk:rds")
     implementation("software.amazon.awssdk:s3")
     implementation("software.amazon.awssdk:sns")
@@ -30,6 +31,7 @@ dependencies {
 
     implementation("info.picocli:picocli:4.6.3")        // CLI option parsing
     implementation("com.diogonunes:JColor:5.5.1")       // Terminal colors
+    implementation("com.squareup.moshi:moshi:1.14.0")   // Json parsing
 
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.9.0")

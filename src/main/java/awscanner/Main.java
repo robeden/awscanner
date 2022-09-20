@@ -36,6 +36,10 @@ public class Main implements Callable<Integer> {
         required = true )
     private String profile;
 
+    @Option( names = { "--pricing-profile" }, description = "Credential profile name",
+        required = false )
+    private String pricing_profile = null;
+
     @Option( names = { "-c", "--color" }, type = Boolean.class,
         negatable = true, defaultValue = "true",
         description = "Enable or disable color console output" )
@@ -47,6 +51,8 @@ public class Main implements Callable<Integer> {
         ColorWriter writer = ColorWriter.create( color_output );
 
         AwsCredentialsProvider cred_provider = ProfileCredentialsProvider.create( profile );
+        AwsCredentialsProvider pricing_cred_provider =
+            pricing_profile == null ? cred_provider : ProfileCredentialsProvider.create( pricing_profile );
 
         GetCallerIdentityResponse response = huntForCallerIdentity( cred_provider );
         System.out.printf( "Caller: user=%1$s account=%2$s arn=%3$s%n",
@@ -61,7 +67,7 @@ public class Main implements Callable<Integer> {
 
         List<Future<RegionInfo>> futures = regions.stream()
             .map( r -> executor.submit(
-                new RegionScanner( r, cred_provider, executor, response.account() ) ) )
+                new RegionScanner( r, cred_provider, pricing_cred_provider, executor, response.account() ) ) )
             .toList();
 
 //		List<Future<RegionInfo>> futures = executor.invokeAll( regions.stream()
