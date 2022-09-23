@@ -3,9 +3,8 @@
  */
 package awscanner;
 
-import awscanner.analyzers.UnusedAMIs;
+import awscanner.analyzers.UnusedEbsVolumes;
 import awscanner.ec2.EBSInfo;
-import awscanner.ec2.ImageInfo;
 import awscanner.ec2.InstanceInfo;
 import awscanner.ec2.SnapshotInfo;
 import picocli.CommandLine;
@@ -20,12 +19,10 @@ import software.amazon.awssdk.services.sts.model.GetCallerIdentityResponse;
 import software.amazon.awssdk.services.sts.model.StsException;
 
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.stream.Collectors;
 
 
 @Command( name = "awscanner", mixinStandardHelpOptions = true )
@@ -34,11 +31,11 @@ public class Main implements Callable<Integer> {
 
     @Option( names = { "-p", "--profile" }, description = "Credential profile name",
         required = true )
-    private String profile;
+    private String[] profiles;
 
     @Option( names = { "--pricing-profile" }, description = "Credential profile name",
         required = false )
-    private String pricing_profile = null;
+    private String[] pricing_profiles = null;
 
     @Option( names = { "-c", "--color" }, type = Boolean.class,
         negatable = true, defaultValue = "true",
@@ -48,18 +45,37 @@ public class Main implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
+        if ( pricing_profiles == null ) {
+            pricing_profiles = profiles;
+        }
+
         ColorWriter writer = ColorWriter.create( color_output );
+
+        for ( int i = 0; i < profiles.length; i++ ) {
+            String profile = profiles[ i ];
+            String pricing_profile = pricing_profiles[ i ];
+
+            doProfile( writer, profile, pricing_profile );
+        }
+
+        return 0;
+    }
+
+    private void doProfile( ColorWriter writer, String profile, String pricing_profile ) throws Exception {
+        writer.println();
+        writer.println("==== " + profile + " ====", ColorWriter.BLUE);
+        writer.println();
 
         AwsCredentialsProvider cred_provider = ProfileCredentialsProvider.create( profile );
         AwsCredentialsProvider pricing_cred_provider =
             pricing_profile == null ? cred_provider : ProfileCredentialsProvider.create( pricing_profile );
 
         GetCallerIdentityResponse response = huntForCallerIdentity( cred_provider );
-        System.out.printf( "Caller: user=%1$s account=%2$s arn=%3$s%n",
-            response.userId(), response.account(), response.arn() );
+//        System.out.printf( "Caller: user=%1$s account=%2$s arn=%3$s%n",
+//            response.userId(), response.account(), response.arn() );
 
         String partition = response.arn().split( ":" )[ 1 ];
-        System.out.println( "Partition: " + partition );
+//        System.out.println( "Partition: " + partition );
 
         ExecutorService executor = Executors.newWorkStealingPool();
 
@@ -74,7 +90,7 @@ public class Main implements Callable<Integer> {
 //			.map( r -> new RegionScanner( r, cred_provider, executor ) )
 //			.toList() );
 
-        System.out.println( "Loading..." );
+//        System.out.println( "Loading..." );
         for ( Future<RegionInfo> future : futures ) {
             RegionInfo region_info = future.get();
 
@@ -108,14 +124,11 @@ public class Main implements Callable<Integer> {
                 writer.println( "  " + snapshot, color );
             }
 
-            writer.println( "Unused AMIs:" );
-            UnusedAMIs.report( region_info, writer );
+            UnusedEbsVolumes.report( region_info, writer );
 
 //          System.out.println( region_info );
 //			System.out.printf( "---- %1$s ----\n%2$s", region_info.region(), region_info );
         }
-
-        return 0;
     }
 
 

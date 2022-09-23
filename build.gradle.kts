@@ -29,10 +29,13 @@ dependencies {
     implementation("software.amazon.awssdk:sts")
     runtimeOnly("software.amazon.awssdk:sso")           // Needed for SSO-based profiles
 
+    implementation("com.sun.mail:jakarta.mail:2.0.1")
+
     implementation("info.picocli:picocli:4.6.3")        // CLI option parsing
     implementation("com.diogonunes:JColor:5.5.1")       // Terminal colors
     implementation("com.squareup.moshi:moshi:1.14.0")   // Json parsing
 
+    runtimeOnly("org.slf4j:slf4j-nop:1.7.30")
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.9.0")
 }

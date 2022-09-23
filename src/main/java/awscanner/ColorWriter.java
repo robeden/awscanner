@@ -38,6 +38,9 @@ public interface ColorWriter {
     default void println( String text ) {
         println( text, NONE );
     }
+    default void println() {
+        println("");
+    }
 
 
     static ColorWriter create( boolean allow_color ) {
