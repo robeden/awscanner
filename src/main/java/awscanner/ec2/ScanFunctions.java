@@ -6,6 +6,10 @@ import awscanner.price.PricingEstimation;
 import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.ec2.model.*;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -31,6 +35,7 @@ public class ScanFunctions {
 
 
     public static Map<String,EBSInfo> scanVolumes( Ec2Client client ) {
+        final LocalDate now = LocalDate.now();
         return client.describeVolumesPaginator().stream()
             .flatMap( r -> r.volumes().stream() )
             .map( v -> new EBSInfo( v.volumeId(),
@@ -42,12 +47,14 @@ public class ScanFunctions {
                 v.size(),
                 v.iops(),
                 v.throughput(),
-                v.volumeTypeAsString() ) )
+                v.volumeTypeAsString(),
+                daysSinceInstant( v.createTime(), now ) ) )
             .collect( Collectors.toUnmodifiableMap( EBSInfo::id, identity() ) );
     }
 
 
     public static Map<String,SnapshotInfo> scanSnapshots( String owner, Ec2Client client ) {
+        final LocalDate now = LocalDate.now();
         var request = DescribeSnapshotsRequest.builder()
             .ownerIds( owner )
             .build();
@@ -60,7 +67,8 @@ public class ScanFunctions {
                 s.ownerId(),
                 s.ownerAlias(),
                 s.description(),
-                s.storageTierAsString()
+                s.storageTierAsString(),
+                daysSinceInstant( s.startTime(), now )
             ) )
             .collect( Collectors.toUnmodifiableMap( SnapshotInfo::id, identity() ) );
     }
@@ -152,5 +160,11 @@ public class ScanFunctions {
                 System.err.println("Unknown platform: " + platform_details);
                 return EC2PriceAttributes.OperatingSystem.LINUX;
         }
+    }
+
+
+    private static int daysSinceInstant( Instant instant, LocalDate now ) {
+        return ( int ) ChronoUnit.DAYS.between(
+            instant.atZone( ZoneId.systemDefault() ).toLocalDate(), now );
     }
 }

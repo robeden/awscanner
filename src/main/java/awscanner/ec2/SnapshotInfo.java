@@ -9,5 +9,6 @@ public record SnapshotInfo(String id,
                            String owner_id,
                            String owner_alias,
                            String description,
-                           String storage_tier) {
+                           String storage_tier,
+                           int days_since_creation ) {
 }

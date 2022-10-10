@@ -13,7 +13,8 @@ public record EBSInfo(String id,
                       Integer size,
                       Integer iops,
                       Integer throughput,
-                      String type) {
+                      String type,
+                      int days_since_creation ) {
 
     public boolean isAttached() {
         return attached_instances.size() > 0;

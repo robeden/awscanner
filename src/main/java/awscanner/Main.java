@@ -35,7 +35,7 @@ public class Main implements Callable<Integer> {
 
     @Option( names = { "--pricing-profile" }, description = "Credential profile name",
         required = false )
-    private String[] pricing_profiles = null;
+    private String pricing_profile = null;
 
     @Option( names = { "-c", "--color" }, type = Boolean.class,
         negatable = true, defaultValue = "true",
@@ -45,15 +45,14 @@ public class Main implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-        if ( pricing_profiles == null ) {
-            pricing_profiles = profiles;
+        if ( pricing_profile == null ) {
+            pricing_profile = profiles[ 0 ];
         }
 
         ColorWriter writer = ColorWriter.create( color_output );
 
         for ( int i = 0; i < profiles.length; i++ ) {
             String profile = profiles[ i ];
-            String pricing_profile = pricing_profiles[ i ];
 
             doProfile( writer, profile, pricing_profile );
         }
@@ -124,7 +123,11 @@ public class Main implements Callable<Integer> {
                 writer.println( "  " + snapshot, color );
             }
 
-            UnusedEbsVolumes.report( region_info, writer );
+            UnusedEbsVolumes.analyze( region_info, writer,
+                Ec2Client.builder()
+                    .region( region_info.region() )
+                    .credentialsProvider( cred_provider )
+                    .build() );
 
 //          System.out.println( region_info );
 //			System.out.printf( "---- %1$s ----\n%2$s", region_info.region(), region_info );

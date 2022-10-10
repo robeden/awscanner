@@ -5,13 +5,10 @@ import awscanner.ec2.ImageInfo;
 import awscanner.ec2.InstanceInfo;
 import awscanner.ec2.SnapshotInfo;
 import awscanner.price.PricingEstimation;
-import software.amazon.awssdk.auth.credentials.AnonymousCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
-import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.pricing.PricingClient;
-import software.amazon.awssdk.services.pricing.model.*;
 import software.amazon.awssdk.services.rds.RdsClient;
 
 import java.util.Map;
