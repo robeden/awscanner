@@ -18,7 +18,7 @@ repositories {
 }
 
 dependencies {
-    implementation(platform("software.amazon.awssdk:bom:2.17.285"))
+    implementation(platform("software.amazon.awssdk:bom:2.17.290"))
     implementation("software.amazon.awssdk:dynamodb")
     implementation("software.amazon.awssdk:ec2")
     implementation("software.amazon.awssdk:lambda")
