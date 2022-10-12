@@ -54,7 +54,9 @@ public class UnusedEbsVolumes {
                     .sorted( String.CASE_INSENSITIVE_ORDER )
                     .collect( Collectors.joining( "," ) ) + ")";
             }
-            writer.println( "    " + ebs.id() + " - " + ebs.size() + suffix, color );
+            writer.println( "    " + ebs.id() + " - " + ebs.size() + " GB, " +
+                ebs.days_since_creation() + " days old" +
+                suffix, color );
         }
         return unused_volumes.stream()
             .map( EBSInfo::id )

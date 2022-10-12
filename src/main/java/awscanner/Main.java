@@ -4,6 +4,7 @@
 package awscanner;
 
 import awscanner.analyzers.UnusedEbsVolumes;
+import awscanner.analyzers.UnusedSnapshots;
 import awscanner.ec2.EBSInfo;
 import awscanner.ec2.InstanceInfo;
 import awscanner.ec2.SnapshotInfo;
@@ -69,6 +70,21 @@ public class Main implements Callable<Integer> {
         AwsCredentialsProvider pricing_cred_provider =
             pricing_profile == null ? cred_provider : ProfileCredentialsProvider.create( pricing_profile );
 
+        String cred_description = "Credential";
+        try {
+            cred_provider.resolveCredentials();
+
+            if ( pricing_cred_provider != cred_provider ) {
+                cred_description = "Pricing credential";
+                pricing_cred_provider.resolveCredentials();
+            }
+        }
+        catch( Exception ex ) {
+            System.err.println( cred_description + " error: " + ex.getMessage() );
+            System.exit( -1 );
+            return;
+        }
+
         GetCallerIdentityResponse response = huntForCallerIdentity( cred_provider );
 //        System.out.printf( "Caller: user=%1$s account=%2$s arn=%3$s%n",
 //            response.userId(), response.account(), response.arn() );
@@ -123,11 +139,12 @@ public class Main implements Callable<Integer> {
                 writer.println( "  " + snapshot, color );
             }
 
-            UnusedEbsVolumes.analyze( region_info, writer,
-                Ec2Client.builder()
+            Ec2Client ec2_client = Ec2Client.builder()
                     .region( region_info.region() )
                     .credentialsProvider( cred_provider )
-                    .build() );
+                    .build();
+            UnusedEbsVolumes.analyze( region_info, writer, ec2_client );
+            UnusedSnapshots.analyze( region_info, writer, ec2_client );
 
 //          System.out.println( region_info );
 //			System.out.printf( "---- %1$s ----\n%2$s", region_info.region(), region_info );
