@@ -4,6 +4,7 @@
 package awscanner;
 
 import awscanner.analyzers.UnusedEbsVolumes;
+import awscanner.analyzers.UnusedSnapshots;
 import awscanner.ec2.EBSInfo;
 import awscanner.ec2.InstanceInfo;
 import awscanner.ec2.SnapshotInfo;
@@ -35,26 +36,40 @@ public class Main implements Callable<Integer> {
 
     @Option( names = { "--pricing-profile" }, description = "Credential profile name",
         required = false )
-    private String[] pricing_profiles = null;
+    private String pricing_profile = null;
 
     @Option( names = { "-c", "--color" }, type = Boolean.class,
         negatable = true, defaultValue = "true",
         description = "Enable or disable color console output" )
     private boolean color_output;
 
+    @Option( names = { "--delete-obvious" }, type = Boolean.class,
+        negatable = false, defaultValue = "false",
+        description = "Delete obviously unused resources. When set to false, these are flagged \"❗️\"" )
+    private boolean delete_obvious = false;
+
 
     @Override
     public Integer call() throws Exception {
-        if ( pricing_profiles == null ) {
-            pricing_profiles = profiles;
+
+        if ( pricing_profile == null ) {
+            pricing_profile = profiles[ 0 ];
         }
 
         ColorWriter writer = ColorWriter.create( color_output );
 
-        for ( int i = 0; i < profiles.length; i++ ) {
-            String profile = profiles[ i ];
-            String pricing_profile = pricing_profiles[ i ];
+        if ( delete_obvious ) {
+            writer.print( "WARNING: ", ColorWriter.Color.RED );
+            writer.print( "--delete-obvious flag is set. Will start " +
+                "possibly destructive run in " );
+            for( int i = 10; i > 0; i-- ) {
+                writer.print( i + "... " );
+                Thread.sleep( 1000 );
+            }
+            writer.println( "now.");
+        }
 
+        for ( String profile : profiles ) {
             doProfile( writer, profile, pricing_profile );
         }
 
@@ -69,6 +84,21 @@ public class Main implements Callable<Integer> {
         AwsCredentialsProvider cred_provider = ProfileCredentialsProvider.create( profile );
         AwsCredentialsProvider pricing_cred_provider =
             pricing_profile == null ? cred_provider : ProfileCredentialsProvider.create( pricing_profile );
+
+        String cred_description = "Credential";
+        try {
+            cred_provider.resolveCredentials();
+
+            if ( pricing_cred_provider != cred_provider ) {
+                cred_description = "Pricing credential";
+                pricing_cred_provider.resolveCredentials();
+            }
+        }
+        catch( Exception ex ) {
+            System.err.println( cred_description + " error: " + ex.getMessage() );
+            System.exit( -1 );
+            return;
+        }
 
         GetCallerIdentityResponse response = huntForCallerIdentity( cred_provider );
 //        System.out.printf( "Caller: user=%1$s account=%2$s arn=%3$s%n",
@@ -124,7 +154,12 @@ public class Main implements Callable<Integer> {
                 writer.println( "  " + snapshot, color );
             }
 
-            UnusedEbsVolumes.report( region_info, writer );
+            Ec2Client ec2_client = Ec2Client.builder()
+                    .region( region_info.region() )
+                    .credentialsProvider( cred_provider )
+                    .build();
+            UnusedEbsVolumes.analyze( region_info, writer, ec2_client, delete_obvious );
+            UnusedSnapshots.analyze( region_info, writer, ec2_client, delete_obvious );
 
 //          System.out.println( region_info );
 //			System.out.printf( "---- %1$s ----\n%2$s", region_info.region(), region_info );

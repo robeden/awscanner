@@ -3,28 +3,27 @@ package awscanner.analyzers;
 import awscanner.ColorWriter;
 import awscanner.RegionInfo;
 import awscanner.ec2.EBSInfo;
-import awscanner.ec2.InstanceInfo;
-import awscanner.ec2.SnapshotInfo;
+import software.amazon.awssdk.services.ec2.Ec2Client;
+import software.amazon.awssdk.services.ec2.model.DeleteVolumeRequest;
 
+import java.util.Comparator;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 
 public class UnusedEbsVolumes {
-    public static void report( RegionInfo region_info, ColorWriter writer ) {
-        Set<String> images_in_use = region_info.instances().values().stream()
-            .map( InstanceInfo::image_id )
-            .collect( Collectors.toSet() );
+    /**
+     * @return          IDs of unused volumes.
+     */
+    public static Set<String> analyze( RegionInfo region_info, ColorWriter writer,
+        Ec2Client client, boolean delete_obvious ) {
 
         Set<String> volumes_in_use = new HashSet<>();
         // In use directly by active instances
         region_info.instances().values().stream()
             .flatMap( i -> i.volume_ids().stream() )
-            .forEach( volumes_in_use::add );
-        // In use by snapshots
-        region_info.snapshots().values().stream()
-            .map( SnapshotInfo::volume_id )
             .forEach( volumes_in_use::add );
         // In use by AMIs
         region_info.images().values().stream()
@@ -32,19 +31,52 @@ public class UnusedEbsVolumes {
             .forEach( volumes_in_use::add );
 
 
-        boolean found_one = false;
-        for ( EBSInfo ebs : region_info.ebs_volumes().values() ) {
-            if ( volumes_in_use.contains( ebs.id() ) ) continue;
+        List<EBSInfo> unused_volumes = region_info.ebs_volumes().values().stream()
+            .filter( ebs -> !volumes_in_use.contains( ebs.id() ) )
+            .sorted( Comparator.comparing( EBSInfo::id ) )
+            .toList();
 
-            if ( !found_one ) {
-                // Header
-                writer.println( "Unused EBS:" );
-                found_one = true;
+        if ( unused_volumes.isEmpty() ) return Set.of();
+
+        writer.println( "Unused EBS (" + unused_volumes.size() + "):" );
+        for ( var ebs : unused_volumes ) {
+            if ( ebs.isAttached() ) {
+                throw new RuntimeException("Logic error: attached  - " + ebs.id() );
+            }
+            ColorWriter.Color color = null;
+            String suffix = "";
+            if ( ebs.tags().isEmpty() ) {
+                color = ColorWriter.Color.RED;
+                suffix = " (untagged)";
+            }
+            else {
+                suffix = " (" + ebs.tags().entrySet().stream()
+                    .map( e -> e.getKey() + "=" + e.getValue() )
+                    .sorted( String.CASE_INSENSITIVE_ORDER )
+                    .collect( Collectors.joining( "," ) ) + ")";
             }
 
-            writer.println( "    " + ebs.id() );
-        }
+            if ( ebs.tags().isEmpty() && ebs.days_since_creation() > 5 ) {
+                if ( delete_obvious ) {
+                    writer.print( "❌" );
+                    client.deleteVolume( DeleteVolumeRequest.builder()
+                        .volumeId( ebs.id() )
+                        .build() );
+                }
+                else {
+                    writer.print( "❗️" );
+                }
+            }
+            else {
+                writer.print( "  " );
+            }
 
-//        if ( !found_one ) writer.println( "  None found." );
+            writer.println( "  " + ebs.id() + " - " + ebs.size() + " GB, " +
+                ebs.days_since_creation() + " days old" +
+                suffix, color );
+        }
+        return unused_volumes.stream()
+            .map( EBSInfo::id )
+            .collect( Collectors.toSet() );
     }
 }

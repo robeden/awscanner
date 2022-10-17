@@ -50,11 +50,13 @@ public interface ColorWriter {
     class JColorWriter implements ColorWriter {
         @Override
         public void print( String text, Color color ) {
+            if ( color == null ) color = Color.NONE;
             System.out.print( Ansi.colorize( text, color.format ) );
         }
 
         @Override
         public void println( String text, Color color ) {
+            if ( color == null ) color = Color.NONE;
             System.out.println( Ansi.colorize( text, color.format ) );
         }
     }
