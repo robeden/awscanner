@@ -4,6 +4,7 @@ import awscanner.ColorWriter;
 import awscanner.RegionInfo;
 import awscanner.ec2.EBSInfo;
 import software.amazon.awssdk.services.ec2.Ec2Client;
+import software.amazon.awssdk.services.ec2.model.DeleteVolumeRequest;
 
 import java.util.Comparator;
 import java.util.HashSet;
@@ -17,7 +18,7 @@ public class UnusedEbsVolumes {
      * @return          IDs of unused volumes.
      */
     public static Set<String> analyze( RegionInfo region_info, ColorWriter writer,
-        Ec2Client client ) {
+        Ec2Client client, boolean delete_obvious ) {
 
         Set<String> volumes_in_use = new HashSet<>();
         // In use directly by active instances
@@ -54,7 +55,23 @@ public class UnusedEbsVolumes {
                     .sorted( String.CASE_INSENSITIVE_ORDER )
                     .collect( Collectors.joining( "," ) ) + ")";
             }
-            writer.println( "    " + ebs.id() + " - " + ebs.size() + " GB, " +
+
+            if ( ebs.tags().isEmpty() && ebs.days_since_creation() > 5 ) {
+                if ( delete_obvious ) {
+                    writer.print( "❌" );
+                    client.deleteVolume( DeleteVolumeRequest.builder()
+                        .volumeId( ebs.id() )
+                        .build() );
+                }
+                else {
+                    writer.print( "❗️" );
+                }
+            }
+            else {
+                writer.print( "  " );
+            }
+
+            writer.println( "  " + ebs.id() + " - " + ebs.size() + " GB, " +
                 ebs.days_since_creation() + " days old" +
                 suffix, color );
         }

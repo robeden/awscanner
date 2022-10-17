@@ -43,18 +43,33 @@ public class Main implements Callable<Integer> {
         description = "Enable or disable color console output" )
     private boolean color_output;
 
+    @Option( names = { "--delete-obvious" }, type = Boolean.class,
+        negatable = false, defaultValue = "false",
+        description = "Delete obviously unused resources. When set to false, these are flagged \"❗️\"" )
+    private boolean delete_obvious = false;
+
 
     @Override
     public Integer call() throws Exception {
+
         if ( pricing_profile == null ) {
             pricing_profile = profiles[ 0 ];
         }
 
         ColorWriter writer = ColorWriter.create( color_output );
 
-        for ( int i = 0; i < profiles.length; i++ ) {
-            String profile = profiles[ i ];
+        if ( delete_obvious ) {
+            writer.print( "WARNING: ", ColorWriter.Color.RED );
+            writer.print( "--delete-obvious flag is set. Will start " +
+                "possibly destructive run in " );
+            for( int i = 10; i > 0; i-- ) {
+                writer.print( i + "... " );
+                Thread.sleep( 1000 );
+            }
+            writer.println( "now.");
+        }
 
+        for ( String profile : profiles ) {
             doProfile( writer, profile, pricing_profile );
         }
 
@@ -143,8 +158,8 @@ public class Main implements Callable<Integer> {
                     .region( region_info.region() )
                     .credentialsProvider( cred_provider )
                     .build();
-            UnusedEbsVolumes.analyze( region_info, writer, ec2_client );
-            UnusedSnapshots.analyze( region_info, writer, ec2_client );
+            UnusedEbsVolumes.analyze( region_info, writer, ec2_client, delete_obvious );
+            UnusedSnapshots.analyze( region_info, writer, ec2_client, delete_obvious );
 
 //          System.out.println( region_info );
 //			System.out.printf( "---- %1$s ----\n%2$s", region_info.region(), region_info );
