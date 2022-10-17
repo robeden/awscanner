@@ -36,7 +36,7 @@ dependencies {
     implementation("com.squareup.moshi:moshi:1.14.0")   // Json parsing
     implementation("org.jgrapht:jgrapht:1.5.1")         // Graph
 
-    runtimeOnly("org.slf4j:slf4j-nop:1.7.30")
+    runtimeOnly("org.slf4j:slf4j-nop:2.0.3")
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.9.1")
 }
