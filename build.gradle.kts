@@ -43,7 +43,7 @@ dependencies {
         }
     }
 
-    runtimeOnly("org.slf4j:slf4j-nop:1.7.30")
+    runtimeOnly("org.slf4j:slf4j-nop:2.0.5")
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.9.1")
 }
