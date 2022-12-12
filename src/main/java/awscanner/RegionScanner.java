@@ -84,6 +84,7 @@ public class RegionScanner implements Callable<RegionInfo> {
             volume_future.get(),
             image_future.get(),
             snapshot_future.get(),
-            scanRdsInstances( rds_client ) );
+            scanRdsInstances( rds_client ),
+            owner_id );
     }
 }

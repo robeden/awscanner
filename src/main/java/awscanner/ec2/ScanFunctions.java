@@ -5,6 +5,7 @@ import awscanner.price.PriceResults;
 import awscanner.price.PricingEstimation;
 import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.ec2.model.*;
+import software.amazon.awssdk.services.pricing.model.PricingException;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -15,12 +16,15 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static java.util.function.Function.identity;
 
 
 public class ScanFunctions {
+    private static final AtomicBoolean DISABLE_PRICING = new AtomicBoolean( false );
+
     public static Map<String,InstanceInfo> scanEc2Instances( Ec2Client client,
         String region, PricingEstimation pricing ) {
 
@@ -112,19 +116,30 @@ public class ScanFunctions {
 
 
     private static InstanceInfo buildInstanceInfo( Instance i, String region, PricingEstimation pricing ) {
-        Future<Optional<PriceResults>> cph_future = pricing.findCostPerHour(
-            new EC2PriceAttributes(
-                region,
-                i.instanceTypeAsString(),
-                platformToOS( i.platformDetails() ),
-                false ) );          // TODO: figure out how to get this
         Optional<PriceResults> cph = Optional.empty();
-        try {
-            cph = cph_future.get();
-        }
-        catch ( Exception e ) {
-            // ignore
-            e.printStackTrace();
+        if ( !DISABLE_PRICING.get() ) {
+            Future<Optional<PriceResults>> cph_future = pricing.findCostPerHour(
+                new EC2PriceAttributes(
+                    region,
+                    i.instanceTypeAsString(),
+                    platformToOS( i.platformDetails() ),
+                    false ) );          // TODO: figure out how to get this
+            try {
+                cph = cph_future.get();
+            }
+            catch ( Exception e ) {
+                boolean handled = false;
+                if ( e.getCause() instanceof PricingException ) {
+                    if ( ( ( PricingException ) e.getCause() ).statusCode() == 400 ) {
+                        DISABLE_PRICING.set( true );
+                        System.err.println( "Pricing lookups disabled due to lookup permission error: " +
+                            e.getCause() );
+                        handled = true;
+                    }
+                }
+
+                if ( !handled ) e.printStackTrace();
+            }
         }
 
         return new InstanceInfo(

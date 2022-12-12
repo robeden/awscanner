@@ -1,7 +1,10 @@
 package awscanner.ec2;
 
+import awscanner.util.ResourceInfo;
+
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 
 
 public record ImageInfo(String id,
@@ -18,5 +21,10 @@ public record ImageInfo(String id,
                         String state,
                         Boolean public_launch_permissions,
                         String creation_date,
-                        Set<String> block_device_mapping_snapshot_ids) {
+                        Set<String> block_device_mapping_snapshot_ids) implements ResourceInfo {
+
+    @Override
+    public Stream<String> usesIds() {
+        return block_device_mapping_snapshot_ids.stream();
+    }
 }

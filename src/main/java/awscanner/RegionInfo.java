@@ -15,5 +15,6 @@ public record RegionInfo(Region region,
                          Map<String,EBSInfo> ebs_volumes,
                          Map<String,ImageInfo> images,
                          Map<String,SnapshotInfo> snapshots,
-                         Map<String,DBInstanceInfo> rds_instances) {
+                         Map<String,DBInstanceInfo> rds_instances,
+                         String ownerId) {
 }

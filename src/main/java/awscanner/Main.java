@@ -8,6 +8,7 @@ import awscanner.analyzers.UnusedSnapshots;
 import awscanner.ec2.EBSInfo;
 import awscanner.ec2.InstanceInfo;
 import awscanner.ec2.SnapshotInfo;
+import awscanner.graph.ResourceGraph;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -19,6 +20,7 @@ import software.amazon.awssdk.services.sts.StsClient;
 import software.amazon.awssdk.services.sts.model.GetCallerIdentityResponse;
 import software.amazon.awssdk.services.sts.model.StsException;
 
+import java.io.File;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -34,8 +36,8 @@ public class Main implements Callable<Integer> {
         required = true )
     private String[] profiles;
 
-    @Option( names = { "--pricing-profile" }, description = "Credential profile name",
-        required = false )
+    @Option( names = { "--pricing-profile" }, description = "Credential profile name"
+    )
     private String pricing_profile = null;
 
     @Option( names = { "-c", "--color" }, type = Boolean.class,
@@ -44,9 +46,12 @@ public class Main implements Callable<Integer> {
     private boolean color_output;
 
     @Option( names = { "--delete-obvious" }, type = Boolean.class,
-        negatable = false, defaultValue = "false",
+        defaultValue = "false",
         description = "Delete obviously unused resources. When set to false, these are flagged \"❗️\"" )
     private boolean delete_obvious = false;
+
+    @Option( names = { "--export" }, type = File.class )
+    private File export_file = null;
 
 
     @Override
@@ -121,8 +126,10 @@ public class Main implements Callable<Integer> {
 //			.toList() );
 
 //        System.out.println( "Loading..." );
+        ResourceGraph graph = new ResourceGraph();
         for ( Future<RegionInfo> future : futures ) {
             RegionInfo region_info = future.get();
+            graph.appendRegionInfo( region_info );
 
             writer.println( region_info.region().id(), ColorWriter.BLUE );
 
@@ -163,6 +170,11 @@ public class Main implements Callable<Integer> {
 
 //          System.out.println( region_info );
 //			System.out.printf( "---- %1$s ----\n%2$s", region_info.region(), region_info );
+        }
+
+        if ( export_file != null ) {
+            graph.export( export_file );
+            System.out.println( "Export to " + export_file + " complete." );
         }
     }
 

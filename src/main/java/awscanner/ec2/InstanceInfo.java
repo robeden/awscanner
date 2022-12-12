@@ -1,12 +1,14 @@
 package awscanner.ec2;
 
 import awscanner.price.PriceResults;
+import awscanner.util.ResourceInfo;
 import software.amazon.awssdk.services.ec2.model.LicenseConfiguration;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 
 
 public record InstanceInfo(String id,
@@ -25,9 +27,21 @@ public record InstanceInfo(String id,
                            Set<String> volume_ids,
                            Set<String> security_group_ids,
                            List<LicenseConfiguration> licenses,
-                           PriceResults price ) {
+                           PriceResults price ) implements ResourceInfo {
 
     public boolean isRunning() {
         return state == InstanceState.RUNNING || state == InstanceState.PENDING;
+    }
+
+
+    @Override
+    public Stream<String> usesIds() {
+        return Stream.concat(
+            Stream.of( image_id ),
+            Stream.concat(
+                volume_ids.stream(),
+                security_group_ids.stream()
+            )
+        );
     }
 }
