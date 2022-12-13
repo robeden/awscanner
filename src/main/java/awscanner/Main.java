@@ -36,8 +36,7 @@ public class Main implements Callable<Integer> {
         required = true )
     private String[] profiles;
 
-    @Option( names = { "--pricing-profile" }, description = "Credential profile name"
-    )
+    @Option( names = { "--pricing-profile" }, description = "Credential profile name" )
     private String pricing_profile = null;
 
     @Option( names = { "-c", "--color" }, type = Boolean.class,
@@ -133,10 +132,10 @@ public class Main implements Callable<Integer> {
 
             writer.println( region_info.region().id(), ColorWriter.BLUE );
 
-            for ( InstanceInfo instance : region_info.instances().values() ) {
-                writer.println( "  " + instance.toString(),
-                    instance.isRunning() ? ColorWriter.GREEN : ColorWriter.RED );
-            }
+//            for ( InstanceInfo instance : region_info.instances().values() ) {
+//                writer.println( "  " + instance.toString(),
+//                    instance.isRunning() ? ColorWriter.GREEN : ColorWriter.RED );
+//            }
             for ( EBSInfo ebs : region_info.ebs_volumes().values() ) {
                 ColorWriter.Color color = ColorWriter.RED;
                 if ( ebs.isAttached() ) {

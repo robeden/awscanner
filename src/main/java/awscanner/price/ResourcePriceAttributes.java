@@ -5,7 +5,7 @@ import software.amazon.awssdk.services.pricing.model.Filter;
 import java.util.Collection;
 
 
-interface ResourcePriceAttributes {
+public interface ResourcePriceAttributes {
     String serviceCode();
     Collection<Filter> buildFilters();
 }

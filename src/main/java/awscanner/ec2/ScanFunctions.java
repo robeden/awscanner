@@ -1,8 +1,6 @@
 package awscanner.ec2;
 
-import awscanner.price.EC2PriceAttributes;
-import awscanner.price.PriceResults;
-import awscanner.price.PricingEstimation;
+import awscanner.price.*;
 import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.ec2.model.*;
 import software.amazon.awssdk.services.pricing.model.PricingException;
@@ -38,21 +36,13 @@ public class ScanFunctions {
     }
 
 
-    public static Map<String,EBSInfo> scanVolumes( Ec2Client client ) {
+    public static Map<String,EBSInfo> scanVolumes( Ec2Client client,
+        String region, PricingEstimation pricing ) {
+
         final LocalDate now = LocalDate.now();
         return client.describeVolumesPaginator().stream()
             .flatMap( r -> r.volumes().stream() )
-            .map( v -> new EBSInfo( v.volumeId(),
-                ec2TagListToMap( v.tags() ),
-                v.attachments().stream().map( VolumeAttachment::volumeId ).collect( Collectors.toSet() ),
-                v.snapshotId(),
-                v.stateAsString(),
-                v.encrypted(),
-                v.size(),
-                v.iops(),
-                v.throughput(),
-                v.volumeTypeAsString(),
-                daysSinceInstant( v.createTime(), now ) ) )
+            .map( v -> buildVolumeInfo( v, now, region, pricing ) )
             .collect( Collectors.toUnmodifiableMap( EBSInfo::id, identity() ) );
     }
 
@@ -115,33 +105,40 @@ public class ScanFunctions {
     }
 
 
-    private static InstanceInfo buildInstanceInfo( Instance i, String region, PricingEstimation pricing ) {
+    private static Optional<PriceResults> lookupCost( PricingEstimation pricing,
+        ResourcePriceAttributes attributes ) {
+
         Optional<PriceResults> cph = Optional.empty();
-        if ( !DISABLE_PRICING.get() ) {
-            Future<Optional<PriceResults>> cph_future = pricing.findCostPerHour(
-                new EC2PriceAttributes(
-                    region,
-                    i.instanceTypeAsString(),
-                    platformToOS( i.platformDetails() ),
-                    false ) );          // TODO: figure out how to get this
-            try {
-                cph = cph_future.get();
-            }
-            catch ( Exception e ) {
-                boolean handled = false;
-                if ( e.getCause() instanceof PricingException ) {
-                    if ( ( ( PricingException ) e.getCause() ).statusCode() == 400 ) {
-                        DISABLE_PRICING.set( true );
-                        System.err.println( "Pricing lookups disabled due to lookup permission error: " +
-                            e.getCause() );
-                        handled = true;
-                    }
-                }
+        if ( DISABLE_PRICING.get() ) return cph;
 
-                if ( !handled ) e.printStackTrace();
-            }
+        Future<Optional<PriceResults>> cph_future = pricing.findCostPerHour(attributes);
+        try {
+            cph = cph_future.get();
         }
+        catch ( Exception e ) {
+            boolean handled = false;
+            if ( e.getCause() instanceof PricingException ) {
+                if ( ( ( PricingException ) e.getCause() ).statusCode() == 400 ) {
+                    DISABLE_PRICING.set( true );
+                    System.err.println( "Pricing lookups disabled due to lookup permission error: " +
+                        e.getCause() );
+                    handled = true;
+                }
+            }
 
+            if ( !handled ) e.printStackTrace();
+        }
+        return cph;
+    }
+
+
+    private static InstanceInfo buildInstanceInfo( Instance i, String region, PricingEstimation pricing ) {
+        Optional<PriceResults> cph = lookupCost( pricing,
+            new EC2PriceAttributes(
+                region,
+                i.instanceTypeAsString(),
+                platformToOS( i.platformDetails() ),
+                false ) );          // TODO: figure out how to get this
         return new InstanceInfo(
                 i.instanceId(),
                 ec2TagListToMap( i.tags() ),
@@ -164,16 +161,43 @@ public class ScanFunctions {
                 cph.orElse( null ) );
     }
 
+    private static EBSInfo buildVolumeInfo( Volume v, LocalDate now, String region,
+        PricingEstimation pricing ) {
+
+        Optional<PriceResults> cph =
+            EBSPriceAttributes.UsageType.findByApiIdentifier( v.volumeTypeAsString() )
+                .flatMap( type -> lookupCost( pricing,
+                    new EBSPriceAttributes(
+                        region,
+                        type ) ) );
+
+        return new EBSInfo(
+            v.volumeId(),
+            ec2TagListToMap( v.tags() ),
+            v.attachments().stream().map( VolumeAttachment::volumeId ).collect( Collectors.toSet() ),
+            v.snapshotId(),
+            v.stateAsString(),
+            v.encrypted(),
+            v.size(),
+            v.iops(),
+            v.throughput(),
+            v.volumeTypeAsString(),
+            daysSinceInstant( v.createTime(), now ),
+            cph.orElse( null ) );
+    }
+
     private static EC2PriceAttributes.OperatingSystem platformToOS( String platform_details ) {
-        switch( platform_details.toUpperCase() ) {
-            case "WINDOWS":
+        switch ( platform_details.toUpperCase() ) {
+            case "WINDOWS" -> {
                 return EC2PriceAttributes.OperatingSystem.WINDOWS;
-            case "LINUX/UNIX":
-            case "RED HAT ENTERPRISE LINUX":
+            }
+            case "LINUX/UNIX", "RED HAT ENTERPRISE LINUX" -> {
                 return EC2PriceAttributes.OperatingSystem.LINUX;
-            default:
-                System.err.println("Unknown platform: " + platform_details);
+            }
+            default -> {
+                System.err.println( "Unknown platform: " + platform_details );
                 return EC2PriceAttributes.OperatingSystem.LINUX;
+            }
         }
     }
 
