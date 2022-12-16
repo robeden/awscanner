@@ -6,7 +6,6 @@ package awscanner;
 import awscanner.analyzers.UnusedEbsVolumes;
 import awscanner.analyzers.UnusedSnapshots;
 import awscanner.ec2.EBSInfo;
-import awscanner.ec2.InstanceInfo;
 import awscanner.ec2.SnapshotInfo;
 import awscanner.graph.ResourceGraph;
 import picocli.CommandLine;
@@ -51,6 +50,14 @@ public class Main implements Callable<Integer> {
 
     @Option( names = { "--export" }, type = File.class )
     private File export_file = null;
+
+    @Option( names = { "--report-by-owner-tag" },
+        description = "Tag name which indicates the owner of a resource" )
+    private String owner_tag = null;
+    @Option( names = { "--owner-tag-split-by" },
+        description = "If the tag specified in `--report-by-owner-tag` can indicate " +
+            "multiple owners, this should be set to the delimiter.")
+    private String owner_tag_delimiter = null;
 
 
     @Override
