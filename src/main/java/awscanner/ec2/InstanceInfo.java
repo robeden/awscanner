@@ -1,6 +1,7 @@
 package awscanner.ec2;
 
 import awscanner.price.PriceResults;
+import awscanner.price.ResourceWithPrice;
 import awscanner.util.ResourceInfo;
 import software.amazon.awssdk.services.ec2.model.LicenseConfiguration;
 
@@ -27,7 +28,7 @@ public record InstanceInfo(String id,
                            Set<String> volume_ids,
                            Set<String> security_group_ids,
                            List<LicenseConfiguration> licenses,
-                           PriceResults price ) implements ResourceInfo {
+                           PriceResults price ) implements ResourceInfo, ResourceWithPrice {
 
     public boolean isRunning() {
         return state == InstanceState.RUNNING || state == InstanceState.PENDING;

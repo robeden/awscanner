@@ -1,7 +1,10 @@
 package awscanner.price;
 
+import awscanner.ec2.InstanceInfo;
+import awscanner.util.ResourceInfo;
 import software.amazon.awssdk.services.pricing.model.Filter;
 
+import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
 
@@ -12,7 +15,7 @@ public record EC2PriceAttributes( String region,
                                   String instance_type,
                                   OperatingSystem os,
                                   boolean dedicated )
-    implements ResourcePriceAttributes {
+    implements ResourcePriceAttributes<InstanceInfo> {
 
     public enum OperatingSystem {
         LINUX( "Linux" ),
@@ -48,5 +51,16 @@ public record EC2PriceAttributes( String region,
             createFilter( "capacitystatus", "Used")   // or AllocatedCapacityReservation,
                                                       //    UnusedCapacityReservation (possibly others)
         );
+    }
+
+
+    @Override
+    public boolean isUnitExpected( String unit ) {
+        return unit.equals( "Hrs" );
+    }
+
+    @Override
+    public BigDecimal convertToPerHour( BigDecimal value, String unit, InstanceInfo resource ) {
+        return value;
     }
 }

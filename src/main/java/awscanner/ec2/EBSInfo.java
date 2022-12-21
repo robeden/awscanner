@@ -1,6 +1,7 @@
 package awscanner.ec2;
 
 import awscanner.price.PriceResults;
+import awscanner.price.ResourceWithPrice;
 import awscanner.util.ResourceInfo;
 
 import java.util.Map;
@@ -18,7 +19,7 @@ public record EBSInfo(String id,
                       Integer throughput,
                       String type,
                       int days_since_creation,
-                      PriceResults price ) implements ResourceInfo {
+                      PriceResults price ) implements ResourceInfo, ResourceWithPrice {
 
 
     public boolean isAttached() {

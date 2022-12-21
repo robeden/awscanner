@@ -112,6 +112,10 @@ public class PricingEstimation {
                 reader.beginObject();
                 reader.nextName();      // crazy identifier II
                 reader.beginObject();
+
+                if ( !seekToName( "unit", reader ) ) return empty();
+                String unit = reader.nextString();
+
                 if ( !seekToName( "pricePerUnit", reader ) ) return empty();
                 reader.beginObject();
                 if ( !seekToName( "USD", reader ) ) return empty();

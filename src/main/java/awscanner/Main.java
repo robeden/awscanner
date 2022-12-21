@@ -8,6 +8,7 @@ import awscanner.analyzers.UnusedSnapshots;
 import awscanner.ec2.EBSInfo;
 import awscanner.ec2.SnapshotInfo;
 import awscanner.graph.ResourceGraph;
+import awscanner.report.OwnerReport;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -20,6 +21,7 @@ import software.amazon.awssdk.services.sts.model.GetCallerIdentityResponse;
 import software.amazon.awssdk.services.sts.model.StsException;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -51,18 +53,33 @@ public class Main implements Callable<Integer> {
     @Option( names = { "--export" }, type = File.class )
     private File export_file = null;
 
-    @Option( names = { "--report-by-owner-tag" },
-        description = "Tag name which indicates the owner of a resource" )
-    private String owner_tag = null;
-    @Option( names = { "--owner-tag-split-by" },
-        description = "If the tag specified in `--report-by-owner-tag` can indicate " +
-            "multiple owners, this should be set to the delimiter.")
-    private String owner_tag_delimiter = null;
+    @CommandLine.ArgGroup(exclusive = false, multiplicity = "0..*")
+    private List<OwnerReportArgs> owner_reports_args;       // Must be uninitialized,
+                                                            // otherwise Picocli errors
+
+    static class OwnerReportArgs {
+        @Option( names = { "--report-by-owner-tag" },
+            description = "Tag name which indicates the owner of a resource",
+            required = true )
+        String owner_tag = null;
+
+        @Option( names = { "--owner-tag-split-by" },
+            description = "If the tag specified in `--report-by-owner-tag` can indicate " +
+                "multiple owners, this should be set to the delimiter.",
+            required = true )
+        String owner_tag_delimiter = null;
+
+        @Option( names = { "--report-data-file" },
+            description = "If specified, report output will be written to the specified file in " +
+                "json format. If not specified, human-friendly output is written to stdout.",
+            required = false,
+            defaultValue = Option.NULL_VALUE )
+        File report_data_file = null;
+    }
 
 
     @Override
     public Integer call() throws Exception {
-
         if ( pricing_profile == null ) {
             pricing_profile = profiles[ 0 ];
         }
@@ -132,6 +149,12 @@ public class Main implements Callable<Integer> {
 //			.toList() );
 
 //        System.out.println( "Loading..." );
+
+        if ( owner_reports_args == null ) owner_reports_args = List.of();
+        List<OwnerReport> owner_reports = owner_reports_args.stream()
+            .map( args -> new OwnerReport( args.owner_tag, args.owner_tag_delimiter, args.report_data_file ) )
+            .toList();
+
         ResourceGraph graph = new ResourceGraph();
         for ( Future<RegionInfo> future : futures ) {
             RegionInfo region_info = future.get();
@@ -181,6 +204,11 @@ public class Main implements Callable<Integer> {
         if ( export_file != null ) {
             graph.export( export_file );
             System.out.println( "Export to " + export_file + " complete." );
+        }
+
+        for ( var report : owner_reports ) {
+            report.process( graph );
+            report.report();
         }
     }
 
