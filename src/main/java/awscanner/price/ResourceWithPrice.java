@@ -1,5 +1,9 @@
 package awscanner.price;
 
+import java.math.BigDecimal;
+import java.util.Optional;
+
+
 public interface ResourceWithPrice {
-    PriceResults price();
+    Optional<BigDecimal> price_per_hour();
 }

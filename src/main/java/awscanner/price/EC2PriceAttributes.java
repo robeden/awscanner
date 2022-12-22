@@ -59,8 +59,8 @@ public record EC2PriceAttributes( String region,
         return unit.equals( "Hrs" );
     }
 
-    @Override
-    public BigDecimal convertToPerHour( BigDecimal value, String unit, InstanceInfo resource ) {
+    public BigDecimal convertToPerHour( BigDecimal value, String unit ) {
+        if ( !isUnitExpected( unit ) ) throw new IllegalArgumentException( "Invalid unit: " + unit );
         return value;
     }
 }

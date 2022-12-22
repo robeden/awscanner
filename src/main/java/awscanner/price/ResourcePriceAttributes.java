@@ -12,5 +12,4 @@ public interface ResourcePriceAttributes<R extends ResourceInfo> {
     Collection<Filter> buildFilters();
 
     boolean isUnitExpected( String unit );
-    BigDecimal convertToPerHour( BigDecimal value, String unit, R resource );
 }

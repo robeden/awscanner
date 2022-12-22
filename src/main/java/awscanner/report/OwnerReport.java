@@ -79,10 +79,15 @@ public class OwnerReport {
         var total = resources.stream()
             .sorted( Comparator.comparing( ResourceInfo::id ) )
             .filter( ri -> ri instanceof ResourceWithPrice )
-            .peek( ri -> System.out.println( "  - " + describe( ri ) + " " +
-                CURRENCY_FORMATTER.format(
-                    ( ( ResourceWithPrice ) ri ).price().price_per_hour().multiply( TWENTY_FOUR ) ) + "/day" ) )
-            .map( ri -> ( ( ResourceWithPrice ) ri ).price().price_per_hour() )
+            .filter( ri -> ( ( ResourceWithPrice ) ri ).price_per_hour().isPresent() )
+            .peek( ri -> System.out.println( "  - " + describe( ri ) + " - " +
+                ( ( ResourceWithPrice ) ri ).price_per_hour()
+                    .map( in -> in.multiply( TWENTY_FOUR ) )
+                    .map( CURRENCY_FORMATTER::format )
+                    .orElse( "unknown" )
+                + "/day" ) )
+            // convert to price/day
+            .map( ri -> ( ( ResourceWithPrice ) ri ).price_per_hour().get().multiply( TWENTY_FOUR ) )
             .reduce( BigDecimal::add );
         if ( total.isPresent() ) {
             System.out.println( "TOTAL: " + CURRENCY_FORMATTER.format( total.get() ) + "/day" );

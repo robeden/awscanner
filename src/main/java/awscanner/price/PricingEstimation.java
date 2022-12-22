@@ -8,8 +8,8 @@ import software.amazon.awssdk.services.pricing.model.*;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -21,7 +21,7 @@ import static java.util.Optional.*;
 public class PricingEstimation {
     private final ExecutorService executor;
     private final PricingClient client;
-    private final ConcurrentHashMap<ResourcePriceAttributes<?>, Future<Optional<PriceResults>>> lookup_map =
+    private final ConcurrentHashMap<ResourcePriceAttributes<?>, Future<Optional<PriceSpecs>>> lookup_map =
         new ConcurrentHashMap<>();
 
 
@@ -34,35 +34,29 @@ public class PricingEstimation {
     }
 
 
-    public Future<Optional<PriceResults>> findCostPerHour( ResourcePriceAttributes<?> attributes ) {
+    public Future<Optional<PriceSpecs>> findPrice( ResourcePriceAttributes<?> attributes ) {
         return lookup_map.computeIfAbsent( attributes, a -> executor.submit( () -> doPriceLookup( a ) ) );
     }
 
 
-    private Optional<PriceResults> doPriceLookup( ResourcePriceAttributes attributes ) {
+    private Optional<PriceSpecs> doPriceLookup( ResourcePriceAttributes<?> attributes ) {
         GetProductsResponse products = client.getProducts(
             GetProductsRequest.builder()
                 .serviceCode( attributes.serviceCode() )
                 .filters( attributes.buildFilters() )
                 .build() );
 
-        List<PriceSpecs> values = products.priceList().stream()
+        Set<PriceSpecs> values = products.priceList().stream()
             .map( PricingEstimation::parsePrice )
             .filter( Optional::isPresent )
             .map( Optional::get )
-            .distinct()
-            .toList();
+            .filter( ps -> attributes.isUnitExpected( ps.unit ) )
+            .collect( Collectors.toSet() );
 
-        return switch ( values.size() ) {
-            case 0 -> Optional.empty();
-            case 1 -> Optional.of( new PriceResults( values.get( 0 ), false ) );
-            default -> Optional.of( new PriceResults(
-                // Average of prices ¯\_(ツ)_/¯
-                BigDecimal.valueOf(
-                    values.stream()
-                        .collect( Collectors.averagingDouble( BigDecimal::doubleValue ) ) ),
-                true ) );
-        };
+        if ( values.size() == 1 ) {
+            return Optional.of( values.iterator().next() );
+        }
+        else return Optional.empty();
     }
 
 
@@ -125,7 +119,8 @@ public class PricingEstimation {
                 return of( reader.nextString() )
                     .map( BigDecimal::new )
                     .map( BigDecimal::stripTrailingZeros )
-                    .filter( bd -> !bd.equals( BigDecimal.ZERO ) );     // remove zero values
+                    .filter( bd -> !bd.equals( BigDecimal.ZERO ) )     // remove zero values
+                    .map( bd -> new PriceSpecs( bd, unit ) );
             }
             catch( Exception ex ) {
                 ex.printStackTrace();

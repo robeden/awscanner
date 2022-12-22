@@ -72,9 +72,8 @@ public record EBSPriceAttributes(String region,
         return unit.equals( "GB-Mo" );
     }
 
-    @Override
-    public BigDecimal convertToPerHour( BigDecimal value, String unit, EBSInfo resource ) {
-        return value.divide( HOURS_PER_MONTH, MathContext.UNLIMITED )
-            .multiply( BigDecimal.valueOf( resource.size() ) );
+    public BigDecimal convertToPerHour( BigDecimal value, String unit, int size_in_gb ) {
+        return value.divide( HOURS_PER_MONTH, MathContext.DECIMAL32 )
+            .multiply( BigDecimal.valueOf( size_in_gb ) );
     }
 }
