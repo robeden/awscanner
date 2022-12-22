@@ -21,8 +21,11 @@ import static java.util.Optional.*;
 public class PricingEstimation {
     private final ExecutorService executor;
     private final PricingClient client;
-    private final ConcurrentHashMap<ResourcePriceAttributes, Future<Optional<PriceResults>>> lookup_map =
+    private final ConcurrentHashMap<ResourcePriceAttributes<?>, Future<Optional<PriceResults>>> lookup_map =
         new ConcurrentHashMap<>();
+
+
+    public record PriceSpecs(BigDecimal price, String unit) {};
 
 
     public PricingEstimation( ExecutorService executor, PricingClient client ) {
@@ -31,7 +34,7 @@ public class PricingEstimation {
     }
 
 
-    public Future<Optional<PriceResults>> findCostPerHour( ResourcePriceAttributes attributes ) {
+    public Future<Optional<PriceResults>> findCostPerHour( ResourcePriceAttributes<?> attributes ) {
         return lookup_map.computeIfAbsent( attributes, a -> executor.submit( () -> doPriceLookup( a ) ) );
     }
 
@@ -43,8 +46,8 @@ public class PricingEstimation {
                 .filters( attributes.buildFilters() )
                 .build() );
 
-        List<BigDecimal> values = products.priceList().stream()
-            .map( PricingEstimation::parsePricePerHour )
+        List<PriceSpecs> values = products.priceList().stream()
+            .map( PricingEstimation::parsePrice )
             .filter( Optional::isPresent )
             .map( Optional::get )
             .distinct()
@@ -68,7 +71,7 @@ public class PricingEstimation {
     }
 
     @SuppressWarnings( "ResultOfMethodCallIgnored" )
-    static Optional<BigDecimal> parsePricePerHour(String price_list_json) {
+    static Optional<PriceSpecs> parsePrice(String price_list_json) {
         try ( Buffer read_buffer = new Buffer() ) {
             read_buffer.writeString( price_list_json, StandardCharsets.UTF_8 );
 
