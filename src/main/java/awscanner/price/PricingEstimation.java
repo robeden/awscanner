@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static java.util.Optional.*;
@@ -24,6 +25,8 @@ public class PricingEstimation {
     private final ConcurrentHashMap<ResourcePriceAttributes, Future<Optional<PriceResults>>> lookup_map =
         new ConcurrentHashMap<>();
 
+    private final AtomicBoolean disable = new AtomicBoolean( false );
+
 
     public PricingEstimation( ExecutorService executor, PricingClient client ) {
         this.executor = executor;
@@ -31,8 +34,29 @@ public class PricingEstimation {
     }
 
 
-    public Future<Optional<PriceResults>> findCostPerHour( ResourcePriceAttributes attributes ) {
-        return lookup_map.computeIfAbsent( attributes, a -> executor.submit( () -> doPriceLookup( a ) ) );
+    public Optional<PriceResults> lookupCost( ResourcePriceAttributes attributes ) {
+        Optional<PriceResults> cph = Optional.empty();
+        if ( disable.get() ) return cph;
+
+        Future<Optional<PriceResults>> cph_future =
+            lookup_map.computeIfAbsent( attributes, a -> executor.submit( () -> doPriceLookup( a ) ) );
+        try {
+            cph = cph_future.get();
+        }
+        catch ( Exception e ) {
+            boolean handled = false;
+            if ( e.getCause() instanceof PricingException ) {
+                if ( ( ( PricingException ) e.getCause() ).statusCode() == 400 ) {
+                    disable.set( true );
+                    System.err.println( "Pricing lookups disabled due to lookup permission error: " +
+                        e.getCause() );
+                    handled = true;
+                }
+            }
+
+            if ( !handled ) e.printStackTrace();
+        }
+        return cph;
     }
 
 
@@ -63,7 +87,7 @@ public class PricingEstimation {
     }
 
 
-    static Filter createFilter( String field, String value ) {
+    public static Filter createFilter( String field, String value ) {
         return Filter.builder().type( FilterType.TERM_MATCH ).field( field ).value( value ).build();
     }
 

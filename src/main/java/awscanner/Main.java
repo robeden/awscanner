@@ -8,6 +8,7 @@ import awscanner.analyzers.UnusedSnapshots;
 import awscanner.ec2.EBSInfo;
 import awscanner.ec2.InstanceInfo;
 import awscanner.ec2.SnapshotInfo;
+import awscanner.efs.EFSInfo;
 import awscanner.graph.ResourceGraph;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -158,6 +159,14 @@ public class Main implements Callable<Integer> {
                     color = ColorWriter.Color.RED;
                 }
                 writer.println( "  " + snapshot, color );
+            }
+            for ( EFSInfo efs : region_info.efs().values() ) {
+                ColorWriter.Color color = ColorWriter.NONE;
+                if ( efs.provisioned_throughput_mibps() != null ) {
+                    color = ColorWriter.Color.YELLOW;
+                }
+                writer.println( "  " + efs, color );
+
             }
 
             Ec2Client ec2_client = Ec2Client.builder()

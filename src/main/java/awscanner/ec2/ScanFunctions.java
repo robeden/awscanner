@@ -1,28 +1,24 @@
 package awscanner.ec2;
 
-import awscanner.price.*;
+import awscanner.price.EBSPriceAttributes;
+import awscanner.price.EC2PriceAttributes;
+import awscanner.price.PriceResults;
+import awscanner.price.PricingEstimation;
+import awscanner.util.UtilFunctions;
 import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.ec2.model.*;
-import software.amazon.awssdk.services.pricing.model.PricingException;
 
-import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static java.util.function.Function.identity;
 
 
 public class ScanFunctions {
-    private static final AtomicBoolean DISABLE_PRICING = new AtomicBoolean( false );
-
     public static Map<String,InstanceInfo> scanEc2Instances( Ec2Client client,
         String region, PricingEstimation pricing ) {
 
@@ -62,7 +58,7 @@ public class ScanFunctions {
                 s.ownerAlias(),
                 s.description(),
                 s.storageTierAsString(),
-                daysSinceInstant( s.startTime(), now )
+                UtilFunctions.daysSinceInstant( s.startTime(), now )
             ) )
             .collect( Collectors.toUnmodifiableMap( SnapshotInfo::id, identity() ) );
     }
@@ -105,35 +101,8 @@ public class ScanFunctions {
     }
 
 
-    private static Optional<PriceResults> lookupCost( PricingEstimation pricing,
-        ResourcePriceAttributes attributes ) {
-
-        Optional<PriceResults> cph = Optional.empty();
-        if ( DISABLE_PRICING.get() ) return cph;
-
-        Future<Optional<PriceResults>> cph_future = pricing.findCostPerHour(attributes);
-        try {
-            cph = cph_future.get();
-        }
-        catch ( Exception e ) {
-            boolean handled = false;
-            if ( e.getCause() instanceof PricingException ) {
-                if ( ( ( PricingException ) e.getCause() ).statusCode() == 400 ) {
-                    DISABLE_PRICING.set( true );
-                    System.err.println( "Pricing lookups disabled due to lookup permission error: " +
-                        e.getCause() );
-                    handled = true;
-                }
-            }
-
-            if ( !handled ) e.printStackTrace();
-        }
-        return cph;
-    }
-
-
     private static InstanceInfo buildInstanceInfo( Instance i, String region, PricingEstimation pricing ) {
-        Optional<PriceResults> cph = lookupCost( pricing,
+        Optional<PriceResults> cph = pricing.lookupCost(
             new EC2PriceAttributes(
                 region,
                 i.instanceTypeAsString(),
@@ -166,11 +135,7 @@ public class ScanFunctions {
 
         Optional<PriceResults> cph =
             EBSPriceAttributes.UsageType.findByApiIdentifier( v.volumeTypeAsString() )
-                .flatMap( type -> lookupCost( pricing,
-                    new EBSPriceAttributes(
-                        region,
-                        type ) ) );
-
+                .flatMap( type -> pricing.lookupCost( new EBSPriceAttributes( region, type ) ) );
         return new EBSInfo(
             v.volumeId(),
             ec2TagListToMap( v.tags() ),
@@ -182,7 +147,7 @@ public class ScanFunctions {
             v.iops(),
             v.throughput(),
             v.volumeTypeAsString(),
-            daysSinceInstant( v.createTime(), now ),
+            UtilFunctions.daysSinceInstant( v.createTime(), now ),
             cph.orElse( null ) );
     }
 
@@ -199,11 +164,5 @@ public class ScanFunctions {
                 return EC2PriceAttributes.OperatingSystem.LINUX;
             }
         }
-    }
-
-
-    private static int daysSinceInstant( Instant instant, LocalDate now ) {
-        return ( int ) ChronoUnit.DAYS.between(
-            instant.atZone( ZoneId.systemDefault() ).toLocalDate(), now );
     }
 }

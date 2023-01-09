@@ -21,6 +21,7 @@ dependencies {
     implementation(platform("software.amazon.awssdk:bom:2.18.35"))
     implementation("software.amazon.awssdk:dynamodb")
     implementation("software.amazon.awssdk:ec2")
+    implementation("software.amazon.awssdk:efs")
     implementation("software.amazon.awssdk:lambda")
     implementation("software.amazon.awssdk:pricing")
     implementation("software.amazon.awssdk:rds")

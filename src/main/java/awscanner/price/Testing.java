@@ -31,18 +31,18 @@ public class Testing {
 
         client.getProductsPaginator(
             GetProductsRequest.builder()
-                .serviceCode( "AmazonEC2" )
+                .serviceCode( "AmazonEFS" )
                 .filters(
-                    PricingEstimation.createFilter( "regionCode", "us-east-1" ),
-                    PricingEstimation.createFilter( "productFamily", "storage" )
+                    PricingEstimation.createFilter( "regionCode", "us-east-1" )
+//                    PricingEstimation.createFilter( "productFamily", "storage" )
                 )
                 .build() ).stream()
-            .flatMap( p -> p.priceList().stream() )
-            .filter( s -> !s.startsWith( "{\"product\":{\"productFamily\":\"Compute Instance\"" ) )
-            .filter( s -> !s.startsWith( "{\"product\":{\"productFamily\":\"Dedicated Host\"" ) )
-            .filter( s -> !s.startsWith( "{\"product\":{\"productFamily\":\"CPU Credits\"" ) )
-            .filter( s -> !s.startsWith( "{\"product\":{\"productFamily\":\"Load Balancer\"" ) )
-            .filter( s -> !s.startsWith( "{\"product\":{\"productFamily\":\"Compute Instance (bare metal)\"" ) )
+//            .flatMap( p -> p.priceList().stream() )
+//            .filter( s -> !s.startsWith( "{\"product\":{\"productFamily\":\"Compute Instance\"" ) )
+//            .filter( s -> !s.startsWith( "{\"product\":{\"productFamily\":\"Dedicated Host\"" ) )
+//            .filter( s -> !s.startsWith( "{\"product\":{\"productFamily\":\"CPU Credits\"" ) )
+//            .filter( s -> !s.startsWith( "{\"product\":{\"productFamily\":\"Load Balancer\"" ) )
+//            .filter( s -> !s.startsWith( "{\"product\":{\"productFamily\":\"Compute Instance (bare metal)\"" ) )
             .forEach( System.out::println );
     }
 }

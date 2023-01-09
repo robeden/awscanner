@@ -4,10 +4,12 @@ import awscanner.ec2.EBSInfo;
 import awscanner.ec2.ImageInfo;
 import awscanner.ec2.InstanceInfo;
 import awscanner.ec2.SnapshotInfo;
+import awscanner.efs.EFSInfo;
 import awscanner.price.PricingEstimation;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.ec2.Ec2Client;
+import software.amazon.awssdk.services.efs.EfsClient;
 import software.amazon.awssdk.services.pricing.PricingClient;
 import software.amazon.awssdk.services.rds.RdsClient;
 
@@ -17,12 +19,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
 import static awscanner.ec2.ScanFunctions.*;
+import static awscanner.efs.ScanFunctions.scanFileSystems;
 import static awscanner.rds.ScanFunctions.scanRdsInstances;
 
 
 public class RegionScanner implements Callable<RegionInfo> {
     private final Region region;
     private final Ec2Client ec2_client;
+    private final EfsClient efs_client;
     private final PricingClient pricing_client;
     private final RdsClient rds_client;
     private final ExecutorService executor;
@@ -35,6 +39,10 @@ public class RegionScanner implements Callable<RegionInfo> {
         this.region = region;
         this.owner_id = owner_id;
         ec2_client = Ec2Client.builder()
+            .region( region )
+            .credentialsProvider( creds )
+            .build();
+        efs_client = EfsClient.builder()
             .region( region )
             .credentialsProvider( creds )
             .build();
@@ -71,6 +79,8 @@ public class RegionScanner implements Callable<RegionInfo> {
             executor.submit( () -> scanSnapshots( owner_id, ec2_client ) );
         Future<Map<String,EBSInfo>> volume_future =
             executor.submit( () -> scanVolumes( ec2_client, region.id(), pricing ) );
+        Future<Map<String,EFSInfo>> efs_future =
+            executor.submit( () -> scanFileSystems( efs_client, region.id(), pricing ) );
 
         // RDS
 //        Future<Map<String,DBInstanceInfo>> db_instance_future =
@@ -84,6 +94,7 @@ public class RegionScanner implements Callable<RegionInfo> {
             volume_future.get(),
             image_future.get(),
             snapshot_future.get(),
+            efs_future.get(),
             scanRdsInstances( rds_client ),
             owner_id );
     }
