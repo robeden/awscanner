@@ -32,7 +32,7 @@ dependencies {
 
     implementation("com.sun.mail:jakarta.mail:2.0.1")
 
-    implementation("info.picocli:picocli:4.7.1")        // CLI option parsing
+    implementation("info.picocli:picocli:4.7.2")        // CLI option parsing
     implementation("com.diogonunes:JColor:5.5.1")       // Terminal colors
     implementation("com.squareup.moshi:moshi:1.14.0")   // Json parsing
 
