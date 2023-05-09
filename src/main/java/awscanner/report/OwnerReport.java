@@ -1,15 +1,12 @@
 package awscanner.report;
 
 import awscanner.graph.ResourceGraph;
-import awscanner.price.PricingEstimation;
 import awscanner.price.ResourceWithPrice;
 import awscanner.util.ResourceInfo;
-import org.jgrapht.Graph;
 
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -90,9 +87,7 @@ public class OwnerReport {
             // convert to price/day
             .map( ri -> ( ( ResourceWithPrice ) ri ).price_per_hour().get().multiply( TWENTY_FOUR ) )
             .reduce( BigDecimal::add );
-        if ( total.isPresent() ) {
-            System.out.println( "TOTAL: " + CURRENCY_FORMATTER.format( total.get() ) + "/day" );
-        }
+        total.ifPresent(cost -> System.out.println("TOTAL: " + CURRENCY_FORMATTER.format(cost) + "/day"));
     }
 
     private void reportToFile( File file ) throws IOException {
