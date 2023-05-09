@@ -3,7 +3,6 @@ package awscanner.analyzers;
 import awscanner.ColorWriter;
 import awscanner.RegionInfo;
 import awscanner.ec2.EBSInfo;
-import awscanner.ec2.ImageInfo;
 import awscanner.ec2.SnapshotInfo;
 import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.ec2.model.DeleteSnapshotRequest;
@@ -17,7 +16,7 @@ public class UnusedSnapshots {
      * @return          IDs of unused volumes.
      */
     public static Set<String> analyze( RegionInfo region_info, ColorWriter writer,
-        Ec2Client client, boolean delete_obvious ) {
+        Ec2Client client, AnalyzerConfig config ) {
 
         Set<String> snapshots_in_use = new HashSet<>();
         region_info.ebs_volumes().values().stream()
@@ -52,8 +51,8 @@ public class UnusedSnapshots {
                     .collect( Collectors.joining( "," ) ) + ")";
             }
 
-            if ( snapshot.tags().isEmpty() && snapshot.days_since_creation() > 5 ) {
-                if ( delete_obvious ) {
+            if ( snapshot.tags().isEmpty() && snapshot.days_since_creation() > 31 ) {
+                if ( config.delete_obvious() ) {
                     writer.print( "❌" );
                     client.deleteSnapshot( DeleteSnapshotRequest.builder()
                         .snapshotId( snapshot.id() )

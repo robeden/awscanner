@@ -18,7 +18,7 @@ public class UnusedEbsVolumes {
      * @return          IDs of unused volumes.
      */
     public static Set<String> analyze( RegionInfo region_info, ColorWriter writer,
-        Ec2Client client, boolean delete_obvious ) {
+        Ec2Client client, AnalyzerConfig config ) {
 
         Set<String> volumes_in_use = new HashSet<>();
         // In use directly by active instances
@@ -56,8 +56,8 @@ public class UnusedEbsVolumes {
                     .collect( Collectors.joining( "," ) ) + ")";
             }
 
-            if ( ebs.tags().isEmpty() && ebs.days_since_creation() > 5 ) {
-                if ( delete_obvious ) {
+            if ( ebs.tags().isEmpty() && ebs.days_since_creation() > 31 ) {
+                if ( config.delete_obvious() ) {
                     writer.print( "❌" );
                     client.deleteVolume( DeleteVolumeRequest.builder()
                         .volumeId( ebs.id() )

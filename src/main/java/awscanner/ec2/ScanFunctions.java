@@ -99,6 +99,11 @@ public class ScanFunctions {
     }
 
 
+    public static boolean isPricingEnabled() {
+        return ! DISABLE_PRICING.get();
+    }
+
+
     private static Map<String,String> ec2TagListToMap( List<Tag> list ) {
         return list.stream().collect( Collectors.toUnmodifiableMap(
             Tag::key, Tag::value ) );

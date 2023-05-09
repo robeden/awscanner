@@ -3,9 +3,12 @@
  */
 package awscanner;
 
+import awscanner.analyzers.AnalyzerConfig;
 import awscanner.analyzers.UnusedEbsVolumes;
 import awscanner.analyzers.UnusedSnapshots;
 import awscanner.ec2.EBSInfo;
+import awscanner.ec2.InstanceInfo;
+import awscanner.ec2.ScanFunctions;
 import awscanner.ec2.SnapshotInfo;
 import awscanner.graph.ResourceGraph;
 import awscanner.report.OwnerReport;
@@ -50,6 +53,11 @@ public class Main implements Callable<Integer> {
         description = "Delete obviously unused resources. When set to false, these are flagged \"❗️\"" )
     private boolean delete_obvious = false;
 
+    @Option( names = { "--obvious-days" }, type = Integer.class,
+        defaultValue = "21",
+        description = "Resources are considered 'obvious' when unused for this many days" )
+    private int obvious_days = 21;
+
     @Option( names = { "--export" }, type = File.class )
     private File export_file = null;
 
@@ -65,14 +73,12 @@ public class Main implements Callable<Integer> {
 
         @Option( names = { "--owner-tag-split-by" },
             description = "If the tag specified in `--report-by-owner-tag` can indicate " +
-                "multiple owners, this should be set to the delimiter.",
-            required = true )
+                "multiple owners, this should be set to the delimiter." )
         String owner_tag_delimiter = null;
 
         @Option( names = { "--report-data-file" },
             description = "If specified, report output will be written to the specified file in " +
                 "json format. If not specified, human-friendly output is written to stdout.",
-            required = false,
             defaultValue = Option.NULL_VALUE )
         File report_data_file = null;
     }
@@ -88,7 +94,7 @@ public class Main implements Callable<Integer> {
 
         if ( delete_obvious ) {
             writer.print( "WARNING: ", ColorWriter.Color.RED );
-            writer.print( "--delete-obvious flag is set. Will start " +
+            writer.print( "--delete-obvious flag is set (days=" + obvious_days + "). Will start " +
                 "possibly destructive run in " );
             for( int i = 10; i > 0; i-- ) {
                 writer.print( i + "... " );
@@ -162,10 +168,10 @@ public class Main implements Callable<Integer> {
 
             writer.println( region_info.region().id(), ColorWriter.BLUE );
 
-//            for ( InstanceInfo instance : region_info.instances().values() ) {
-//                writer.println( "  " + instance.toString(),
-//                    instance.isRunning() ? ColorWriter.GREEN : ColorWriter.RED );
-//            }
+            for ( InstanceInfo instance : region_info.instances().values() ) {
+                writer.println( "  " + instance.toString(),
+                    instance.isRunning() ? ColorWriter.GREEN : ColorWriter.RED );
+            }
             for ( EBSInfo ebs : region_info.ebs_volumes().values() ) {
                 ColorWriter.Color color = ColorWriter.RED;
                 if ( ebs.isAttached() ) {
@@ -190,12 +196,13 @@ public class Main implements Callable<Integer> {
                 writer.println( "  " + snapshot, color );
             }
 
+            AnalyzerConfig analyzer_config = new AnalyzerConfig(delete_obvious, obvious_days);
             Ec2Client ec2_client = Ec2Client.builder()
                     .region( region_info.region() )
                     .credentialsProvider( cred_provider )
                     .build();
-            UnusedEbsVolumes.analyze( region_info, writer, ec2_client, delete_obvious );
-            UnusedSnapshots.analyze( region_info, writer, ec2_client, delete_obvious );
+            UnusedEbsVolumes.analyze( region_info, writer, ec2_client, analyzer_config );
+            UnusedSnapshots.analyze( region_info, writer, ec2_client, analyzer_config );
 
 //          System.out.println( region_info );
 //			System.out.printf( "---- %1$s ----\n%2$s", region_info.region(), region_info );
@@ -206,6 +213,11 @@ public class Main implements Callable<Integer> {
             System.out.println( "Export to " + export_file + " complete." );
         }
 
+        if ( !owner_reports.isEmpty() && !ScanFunctions.isPricingEnabled() ) {
+            System.err.println( "Owner report is not available because pricing lookups are disabled. " +
+                "See earlier error message for details." );
+            System.exit( -1 );
+        }
         for ( var report : owner_reports ) {
             report.process( graph );
             report.report();

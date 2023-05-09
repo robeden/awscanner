@@ -77,9 +77,10 @@ public class OwnerReport {
     private void reportToStdout_singleEntry( String owner, Set<ResourceInfo> resources ) {
         System.out.println( owner );
         var total = resources.stream()
-            .sorted( Comparator.comparing( ResourceInfo::id ) )
             .filter( ri -> ri instanceof ResourceWithPrice )
             .filter( ri -> ( ( ResourceWithPrice ) ri ).price_per_hour().isPresent() )
+            .sorted( Comparator
+                .comparing( ri -> ( ( ResourceWithPrice ) ri ).price_per_hour().get() ).reversed() )
             .peek( ri -> System.out.println( "  - " + describe( ri ) + " - " +
                 ( ( ResourceWithPrice ) ri ).price_per_hour()
                     .map( in -> in.multiply( TWENTY_FOUR ) )
