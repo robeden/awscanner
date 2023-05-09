@@ -8,8 +8,8 @@ import software.amazon.awssdk.services.pricing.model.*;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -22,10 +22,13 @@ import static java.util.Optional.*;
 public class PricingEstimation {
     private final ExecutorService executor;
     private final PricingClient client;
-    private final ConcurrentHashMap<ResourcePriceAttributes, Future<Optional<PriceResults>>> lookup_map =
+    private final ConcurrentHashMap<ResourcePriceAttributes<?>, Future<Optional<PriceSpecs>>> lookup_map =
         new ConcurrentHashMap<>();
 
     private final AtomicBoolean disable = new AtomicBoolean( false );
+
+
+    public record PriceSpecs(BigDecimal price, String unit) {};
 
 
     public PricingEstimation( ExecutorService executor, PricingClient client ) {
@@ -34,11 +37,11 @@ public class PricingEstimation {
     }
 
 
-    public Optional<PriceResults> lookupCost( ResourcePriceAttributes attributes ) {
-        Optional<PriceResults> cph = Optional.empty();
+    public Optional<PriceSpecs> lookupCost( ResourcePriceAttributes<?> attributes ) {
+        Optional<PriceSpecs> cph = Optional.empty();
         if ( disable.get() ) return cph;
 
-        Future<Optional<PriceResults>> cph_future =
+        Future<Optional<PriceSpecs>> cph_future =
             lookup_map.computeIfAbsent( attributes, a -> executor.submit( () -> doPriceLookup( a ) ) );
         try {
             cph = cph_future.get();
@@ -60,30 +63,24 @@ public class PricingEstimation {
     }
 
 
-    private Optional<PriceResults> doPriceLookup( ResourcePriceAttributes attributes ) {
+    private Optional<PriceSpecs> doPriceLookup( ResourcePriceAttributes<?> attributes ) {
         GetProductsResponse products = client.getProducts(
             GetProductsRequest.builder()
                 .serviceCode( attributes.serviceCode() )
                 .filters( attributes.buildFilters() )
                 .build() );
 
-        List<BigDecimal> values = products.priceList().stream()
-            .map( PricingEstimation::parsePricePerHour )
+        Set<PriceSpecs> values = products.priceList().stream()
+            .map( PricingEstimation::parsePrice )
             .filter( Optional::isPresent )
             .map( Optional::get )
-            .distinct()
-            .toList();
+            .filter( ps -> attributes.isUnitExpected( ps.unit ) )
+            .collect( Collectors.toSet() );
 
-        return switch ( values.size() ) {
-            case 0 -> Optional.empty();
-            case 1 -> Optional.of( new PriceResults( values.get( 0 ), false ) );
-            default -> Optional.of( new PriceResults(
-                // Average of prices ¯\_(ツ)_/¯
-                BigDecimal.valueOf(
-                    values.stream()
-                        .collect( Collectors.averagingDouble( BigDecimal::doubleValue ) ) ),
-                true ) );
-        };
+        if ( values.size() == 1 ) {
+            return Optional.of( values.iterator().next() );
+        }
+        else return Optional.empty();
     }
 
 
@@ -92,7 +89,7 @@ public class PricingEstimation {
     }
 
     @SuppressWarnings( "ResultOfMethodCallIgnored" )
-    static Optional<BigDecimal> parsePricePerHour(String price_list_json) {
+    static Optional<PriceSpecs> parsePrice(String price_list_json) {
         try ( Buffer read_buffer = new Buffer() ) {
             read_buffer.writeString( price_list_json, StandardCharsets.UTF_8 );
 
@@ -136,13 +133,18 @@ public class PricingEstimation {
                 reader.beginObject();
                 reader.nextName();      // crazy identifier II
                 reader.beginObject();
+
+                if ( !seekToName( "unit", reader ) ) return empty();
+                String unit = reader.nextString();
+
                 if ( !seekToName( "pricePerUnit", reader ) ) return empty();
                 reader.beginObject();
                 if ( !seekToName( "USD", reader ) ) return empty();
                 return of( reader.nextString() )
                     .map( BigDecimal::new )
                     .map( BigDecimal::stripTrailingZeros )
-                    .filter( bd -> !bd.equals( BigDecimal.ZERO ) );     // remove zero values
+                    .filter( bd -> !bd.equals( BigDecimal.ZERO ) )     // remove zero values
+                    .map( bd -> new PriceSpecs( bd, unit ) );
             }
             catch( Exception ex ) {
                 ex.printStackTrace();

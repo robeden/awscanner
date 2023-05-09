@@ -1,9 +1,12 @@
 package awscanner.ec2;
 
 import awscanner.price.PriceResults;
+import awscanner.price.ResourceWithPrice;
 import awscanner.util.ResourceInfo;
 
+import java.math.BigDecimal;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 
@@ -18,7 +21,7 @@ public record EBSInfo(String id,
                       Integer throughput,
                       String type,
                       int days_since_creation,
-                      PriceResults price ) implements ResourceInfo {
+                      Optional<BigDecimal> price_per_hour ) implements ResourceInfo, ResourceWithPrice {
 
 
     public boolean isAttached() {

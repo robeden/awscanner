@@ -1,7 +1,10 @@
 package awscanner.price;
 
+import awscanner.ec2.EBSInfo;
 import software.amazon.awssdk.services.pricing.model.Filter;
 
+import java.math.BigDecimal;
+import java.math.MathContext;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -11,7 +14,10 @@ import static awscanner.price.PricingEstimation.createFilter;
 
 public record EBSPriceAttributes(String region,
                                  UsageType type )
-    implements ResourcePriceAttributes {
+    implements ResourcePriceAttributes<EBSInfo> {
+
+    private static BigDecimal HOURS_PER_MONTH = BigDecimal.valueOf( 30 * 24 );
+
 
     public enum UsageType {
         // For API identifiers, see:
@@ -58,5 +64,16 @@ public record EBSPriceAttributes(String region,
             createFilter( "regionCode", region ),
             createFilter( "volumeApiName", type.apiIdentifier )
         );
+    }
+
+
+    @Override
+    public boolean isUnitExpected( String unit ) {
+        return unit.equals( "GB-Mo" );
+    }
+
+    public BigDecimal convertToPerHour( BigDecimal value, String unit, int size_in_gb ) {
+        return value.divide( HOURS_PER_MONTH, MathContext.DECIMAL32 )
+            .multiply( BigDecimal.valueOf( size_in_gb ) );
     }
 }

@@ -13,6 +13,8 @@ import java.io.File;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 
@@ -41,6 +43,19 @@ public class ResourceGraph {
             .flatMap( o -> ( Stream<ResourceInfo> ) o )
             .forEach( resource -> loadConnections( resource, resource.usesIds() ) );
     }
+
+    public Collection<ResourceInfo> getUsedResources( ResourceInfo source ) {
+        return graph.edgesOf( source ).stream()
+            .map( graph::getEdgeTarget )
+            .filter( r -> r != source )
+            .collect( Collectors.toSet() );
+    }
+
+
+    public void forEachResource( Consumer<ResourceInfo> resource_walker ) {
+        graph.vertexSet().forEach( resource_walker );
+    }
+
 
     public void export( File file ) throws ExportException {
         // DOT Language docs: https://www.graphviz.org/doc/info/lang.html

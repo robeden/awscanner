@@ -1,12 +1,15 @@
 package awscanner.ec2;
 
 import awscanner.price.PriceResults;
+import awscanner.price.ResourceWithPrice;
 import awscanner.util.ResourceInfo;
 import software.amazon.awssdk.services.ec2.model.LicenseConfiguration;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -27,7 +30,7 @@ public record InstanceInfo(String id,
                            Set<String> volume_ids,
                            Set<String> security_group_ids,
                            List<LicenseConfiguration> licenses,
-                           PriceResults price ) implements ResourceInfo {
+                           Optional<BigDecimal> price_per_hour ) implements ResourceInfo, ResourceWithPrice {
 
     public boolean isRunning() {
         return state == InstanceState.RUNNING || state == InstanceState.PENDING;

@@ -95,19 +95,52 @@ public class ScanFunctions {
     }
 
 
+    public static boolean isPricingEnabled() {
+        return ! DISABLE_PRICING.get();
+    }
+
+
     private static Map<String,String> ec2TagListToMap( List<Tag> list ) {
         return list.stream().collect( Collectors.toUnmodifiableMap(
             Tag::key, Tag::value ) );
     }
 
 
+    private static Optional<PricingEstimation.PriceSpecs> lookupCost( PricingEstimation pricing,
+        ResourcePriceAttributes<?> attributes ) {
+
+        Optional<PricingEstimation.PriceSpecs> cph = Optional.empty();
+        if ( DISABLE_PRICING.get() ) return cph;
+
+        Future<Optional<PricingEstimation.PriceSpecs>> cph_future = pricing.findPrice(attributes);
+        try {
+            cph = cph_future.get();
+        }
+        catch ( Exception e ) {
+            boolean handled = false;
+            if ( e.getCause() instanceof PricingException ) {
+                if ( ( ( PricingException ) e.getCause() ).statusCode() == 400 ) {
+                    DISABLE_PRICING.set( true );
+                    System.err.println( "Pricing lookups disabled due to lookup permission error: " +
+                        e.getCause() );
+                    handled = true;
+                }
+            }
+
+            if ( !handled ) e.printStackTrace();
+        }
+        return cph;
+    }
+
+
     private static InstanceInfo buildInstanceInfo( Instance i, String region, PricingEstimation pricing ) {
-        Optional<PriceResults> cph = pricing.lookupCost(
-            new EC2PriceAttributes(
-                region,
-                i.instanceTypeAsString(),
-                platformToOS( i.platformDetails() ),
-                false ) );          // TODO: figure out how to get this
+
+        EC2PriceAttributes price_attributes = new EC2PriceAttributes( region,
+            i.instanceTypeAsString(), platformToOS( i.platformDetails() ),
+            false );          // TODO: figure out how to get this
+
+        Optional<PricingEstimation.PriceSpecs> cph = lookupCost( pricing, price_attributes );
+
         return new InstanceInfo(
                 i.instanceId(),
                 ec2TagListToMap( i.tags() ),
@@ -127,15 +160,19 @@ public class ScanFunctions {
                     .collect( Collectors.toSet() ),
                 i.securityGroups().stream().map( GroupIdentifier::groupId ).collect( Collectors.toSet() ),
                 i.licenses(),
-                cph.orElse( null ) );
+                cph.map( ps -> price_attributes.convertToPerHour( ps.price(), ps.unit() ) ) );
     }
 
     private static EBSInfo buildVolumeInfo( Volume v, LocalDate now, String region,
         PricingEstimation pricing ) {
 
-        Optional<PriceResults> cph =
+        Optional<EBSPriceAttributes> price_attributes =
             EBSPriceAttributes.UsageType.findByApiIdentifier( v.volumeTypeAsString() )
-                .flatMap( type -> pricing.lookupCost( new EBSPriceAttributes( region, type ) ) );
+                .map( type -> new EBSPriceAttributes( region, type ) );
+
+        Optional<PricingEstimation.PriceSpecs> cph = price_attributes
+            .flatMap( att -> lookupCost( pricing, att ) );
+
         return new EBSInfo(
             v.volumeId(),
             ec2TagListToMap( v.tags() ),
@@ -148,7 +185,9 @@ public class ScanFunctions {
             v.throughput(),
             v.volumeTypeAsString(),
             UtilFunctions.daysSinceInstant( v.createTime(), now ),
-            cph.orElse( null ) );
+            // NOTE: The get() is okay because cph will be empty if price_attributes was empty
+            cph.map( spec -> price_attributes.get()
+                .convertToPerHour( spec.price(), spec.unit(), v.size() ) ) );
     }
 
     private static EC2PriceAttributes.OperatingSystem platformToOS( String platform_details ) {
