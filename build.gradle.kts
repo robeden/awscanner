@@ -34,7 +34,7 @@ dependencies {
 
     implementation("info.picocli:picocli:4.7.3")        // CLI option parsing
     implementation("com.diogonunes:JColor:5.5.1")       // Terminal colors
-    implementation("com.squareup.moshi:moshi:1.14.0")   // Json parsing
+    implementation("com.squareup.moshi:moshi:1.15.0")   // Json parsing
 
     implementation("org.jgrapht:jgrapht-core:1.5.2")    // Graph
     implementation("org.jgrapht:jgrapht-io:1.5.2")      // Graph
