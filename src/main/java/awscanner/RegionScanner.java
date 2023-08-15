@@ -96,6 +96,7 @@ public class RegionScanner implements Callable<RegionInfo> {
             snapshot_future.get(),
             efs_future.get(),
             scanRdsInstances( rds_client ),
-            owner_id );
+            owner_id,
+            !pricing.disabled() );
     }
 }

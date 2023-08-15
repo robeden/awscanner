@@ -37,6 +37,11 @@ public class PricingEstimation {
     }
 
 
+    public boolean disabled() {
+        return disable.get();
+    }
+
+
     public Optional<PriceSpecs> lookupCost( ResourcePriceAttributes<?> attributes ) {
         Optional<PriceSpecs> cph = Optional.empty();
         if ( disable.get() ) return cph;

@@ -2,7 +2,6 @@ package awscanner.ec2;
 
 import awscanner.price.EBSPriceAttributes;
 import awscanner.price.EC2PriceAttributes;
-import awscanner.price.PriceResults;
 import awscanner.price.PricingEstimation;
 import awscanner.util.UtilFunctions;
 import software.amazon.awssdk.services.ec2.Ec2Client;
@@ -95,41 +94,9 @@ public class ScanFunctions {
     }
 
 
-    public static boolean isPricingEnabled() {
-        return ! DISABLE_PRICING.get();
-    }
-
-
     private static Map<String,String> ec2TagListToMap( List<Tag> list ) {
         return list.stream().collect( Collectors.toUnmodifiableMap(
             Tag::key, Tag::value ) );
-    }
-
-
-    private static Optional<PricingEstimation.PriceSpecs> lookupCost( PricingEstimation pricing,
-        ResourcePriceAttributes<?> attributes ) {
-
-        Optional<PricingEstimation.PriceSpecs> cph = Optional.empty();
-        if ( DISABLE_PRICING.get() ) return cph;
-
-        Future<Optional<PricingEstimation.PriceSpecs>> cph_future = pricing.findPrice(attributes);
-        try {
-            cph = cph_future.get();
-        }
-        catch ( Exception e ) {
-            boolean handled = false;
-            if ( e.getCause() instanceof PricingException ) {
-                if ( ( ( PricingException ) e.getCause() ).statusCode() == 400 ) {
-                    DISABLE_PRICING.set( true );
-                    System.err.println( "Pricing lookups disabled due to lookup permission error: " +
-                        e.getCause() );
-                    handled = true;
-                }
-            }
-
-            if ( !handled ) e.printStackTrace();
-        }
-        return cph;
     }
 
 
@@ -139,7 +106,7 @@ public class ScanFunctions {
             i.instanceTypeAsString(), platformToOS( i.platformDetails() ),
             false );          // TODO: figure out how to get this
 
-        Optional<PricingEstimation.PriceSpecs> cph = lookupCost( pricing, price_attributes );
+        Optional<PricingEstimation.PriceSpecs> cph = pricing.lookupCost( price_attributes );
 
         return new InstanceInfo(
                 i.instanceId(),
@@ -171,7 +138,7 @@ public class ScanFunctions {
                 .map( type -> new EBSPriceAttributes( region, type ) );
 
         Optional<PricingEstimation.PriceSpecs> cph = price_attributes
-            .flatMap( att -> lookupCost( pricing, att ) );
+            .flatMap(pricing::lookupCost);
 
         return new EBSInfo(
             v.volumeId(),

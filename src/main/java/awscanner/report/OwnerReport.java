@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.text.NumberFormat;
 import java.util.*;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 
 public class OwnerReport {
@@ -87,7 +88,8 @@ public class OwnerReport {
             // convert to price/day
             .map( ri -> ( ( ResourceWithPrice ) ri ).price_per_hour().get().multiply( TWENTY_FOUR ) )
             .reduce( BigDecimal::add );
-        total.ifPresent(cost -> System.out.println("TOTAL: " + CURRENCY_FORMATTER.format(cost) + "/day"));
+        total.ifPresent(cost -> System.out.println("TOTAL: " + CURRENCY_FORMATTER.format(cost) + "/day" +
+            " (" + CURRENCY_FORMATTER.format(cost.multiply(BigDecimal.valueOf(30))) + "/mo)"));
     }
 
     private void reportToFile( File file ) throws IOException {

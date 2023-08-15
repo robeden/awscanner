@@ -18,5 +18,6 @@ public record RegionInfo(Region region,
                          Map<String,SnapshotInfo> snapshots,
                          Map<String,EFSInfo> efs,
                          Map<String,DBInstanceInfo> rds_instances,
-                         String ownerId) {
+                         String ownerId,
+                         boolean pricing_enabled) {
 }

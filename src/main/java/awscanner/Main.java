@@ -163,9 +163,12 @@ public class Main implements Callable<Integer> {
             .toList();
 
         ResourceGraph graph = new ResourceGraph();
+        boolean any_pricing_enabled = false;
         for ( Future<RegionInfo> future : futures ) {
             RegionInfo region_info = future.get();
             graph.appendRegionInfo( region_info );
+
+            if ( region_info.pricing_enabled() ) any_pricing_enabled = true;
 
             writer.println( region_info.region().id(), ColorWriter.BLUE );
 
@@ -222,7 +225,7 @@ public class Main implements Callable<Integer> {
             System.out.println( "Export to " + export_file + " complete." );
         }
 
-        if ( !owner_reports.isEmpty() && !ScanFunctions.isPricingEnabled() ) {
+        if ( !owner_reports.isEmpty() && !any_pricing_enabled ) {
             System.err.println( "Owner report is not available because pricing lookups are disabled. " +
                 "See earlier error message for details." );
             System.exit( -1 );
