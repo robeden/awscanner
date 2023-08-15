@@ -18,7 +18,7 @@ repositories {
 }
 
 dependencies {
-    implementation(platform("software.amazon.awssdk:bom:2.20.61"))
+    implementation(platform("software.amazon.awssdk:bom:2.20.109"))
     implementation("software.amazon.awssdk:dynamodb")
     implementation("software.amazon.awssdk:ec2")
     implementation("software.amazon.awssdk:efs")
@@ -34,7 +34,7 @@ dependencies {
 
     implementation("info.picocli:picocli:4.7.3")        // CLI option parsing
     implementation("com.diogonunes:JColor:5.5.1")       // Terminal colors
-    implementation("com.squareup.moshi:moshi:1.14.0")   // Json parsing
+    implementation("com.squareup.moshi:moshi:1.15.0")   // Json parsing
 
     implementation("org.jgrapht:jgrapht-core:1.5.2")    // Graph
     implementation("org.jgrapht:jgrapht-io:1.5.2")      // Graph
@@ -46,7 +46,7 @@ dependencies {
 
     runtimeOnly("org.slf4j:slf4j-nop:1.7.36")
 
-    testImplementation("org.junit.jupiter:junit-jupiter:5.9.3")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
 }
 
 application {
