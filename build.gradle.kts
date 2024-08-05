@@ -5,7 +5,7 @@ plugins {
 }
 
 tasks.compileJava {
-    options.release.set(19)
+    options.release.set(21)
 }
 //java {
 //    toolchain {
@@ -18,17 +18,20 @@ repositories {
 }
 
 dependencies {
-    implementation(platform("software.amazon.awssdk:bom:2.20.162"))
+    implementation(platform("software.amazon.awssdk:bom:[2.20.162,3.)"))
+    implementation("software.amazon.awssdk:cloudfront")
     implementation("software.amazon.awssdk:dynamodb")
     implementation("software.amazon.awssdk:ec2")
     implementation("software.amazon.awssdk:efs")
     implementation("software.amazon.awssdk:lambda")
     implementation("software.amazon.awssdk:pricing")
     implementation("software.amazon.awssdk:rds")
+    implementation("software.amazon.awssdk:route53")
     implementation("software.amazon.awssdk:s3")
     implementation("software.amazon.awssdk:sns")
     implementation("software.amazon.awssdk:sts")
     runtimeOnly("software.amazon.awssdk:sso")           // Needed for SSO-based profiles
+    runtimeOnly("software.amazon.awssdk:ssooidc")       // Needed for SSO-based profiles
 
     implementation("com.sun.mail:jakarta.mail:2.0.1")
 
