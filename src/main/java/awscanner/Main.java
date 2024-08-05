@@ -6,13 +6,14 @@ package awscanner;
 import awscanner.analyzers.AnalyzerConfig;
 import awscanner.analyzers.UnusedEbsVolumes;
 import awscanner.analyzers.UnusedSnapshots;
+import awscanner.ec2.CFDistributionInfo;
 import awscanner.ec2.EBSInfo;
 import awscanner.ec2.InstanceInfo;
-import awscanner.ec2.ScanFunctions;
 import awscanner.ec2.SnapshotInfo;
 import awscanner.efs.EFSInfo;
 import awscanner.graph.ResourceGraph;
 import awscanner.report.OwnerReport;
+import awscanner.route53.ZoneInfo;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -25,12 +26,9 @@ import software.amazon.awssdk.services.sts.model.GetCallerIdentityResponse;
 import software.amazon.awssdk.services.sts.model.StsException;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
+import java.util.stream.Stream;
 
 
 @Command( name = "awscanner", mixinStandardHelpOptions = true )
@@ -165,12 +163,21 @@ public class Main implements Callable<Integer> {
         ResourceGraph graph = new ResourceGraph();
         boolean any_pricing_enabled = false;
         for ( Future<RegionInfo> future : futures ) {
-            RegionInfo region_info = future.get();
+            RegionInfo region_info;
+            try {
+                region_info = future.get();
+            }
+            catch(ExecutionException ex ) {
+                writer.println("ERROR: UNABLE TO LIST (" + ex + ")");
+                continue;
+            }
             graph.appendRegionInfo( region_info );
 
             if ( region_info.pricing_enabled() ) any_pricing_enabled = true;
 
-            writer.println( region_info.region().id(), ColorWriter.BLUE );
+            int instance_count = region_info.instances().size();
+            writer.println( region_info.region().id() + " (instances=" + instance_count + ")",
+                ColorWriter.BLUE );
 
             for ( InstanceInfo instance : region_info.instances().values() ) {
                 writer.println( "  " + instance.toString(),
@@ -205,7 +212,20 @@ public class Main implements Callable<Integer> {
                     color = ColorWriter.Color.YELLOW;
                 }
                 writer.println( "  " + efs, color );
-
+            }
+            for ( ZoneInfo zone : region_info.route53_zones().values() ) {
+                ColorWriter.Color color = ColorWriter.NONE;
+                if (!zone.is_private() ) {
+                    color = ColorWriter.Color.YELLOW;
+                }
+                writer.println( "  " + zone, color );
+            }
+            for (CFDistributionInfo info : region_info.cf_dists().values() ) {
+                ColorWriter.Color color = ColorWriter.NONE;
+                if (!info.enabled() ) {
+                    color = ColorWriter.Color.YELLOW;
+                }
+                writer.println( "  " + info, color );
             }
 
             AnalyzerConfig analyzer_config = new AnalyzerConfig(delete_obvious, obvious_days);
@@ -243,10 +263,12 @@ public class Main implements Callable<Integer> {
             .credentialsProvider( cred_provider )
             .build() ) {
 
-            return client.describeRegions().regions().stream()
-                .filter( r -> !r.optInStatus().equals( "not-opted-in" ) )
-                .map( r -> Region.of( r.regionName() ) )
-                .toList();
+            return Stream.concat(
+                Stream.of( is_gov ? Region.AWS_US_GOV_GLOBAL : Region.AWS_GLOBAL),
+                client.describeRegions().regions().stream()
+                    .filter( r -> !r.optInStatus().equals( "not-opted-in" ) )
+                    .map( r -> Region.of( r.regionName() ) )
+            ).toList();
         }
     }
 

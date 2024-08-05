@@ -4,14 +4,15 @@ import awscanner.price.EBSPriceAttributes;
 import awscanner.price.EC2PriceAttributes;
 import awscanner.price.PricingEstimation;
 import awscanner.util.UtilFunctions;
+import software.amazon.awssdk.services.cloudfront.CloudFrontClient;
+import software.amazon.awssdk.services.cloudfront.model.ListDistributionsResponse;
 import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.ec2.model.*;
 
+import java.time.Instant;
 import java.time.LocalDate;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static java.util.function.Function.identity;
@@ -21,12 +22,26 @@ public class ScanFunctions {
     public static Map<String,InstanceInfo> scanEc2Instances( Ec2Client client,
         String region, PricingEstimation pricing ) {
 
+        Map<String,SecurityGroup> security_group_map = new HashMap<>();
+        Function<String,SecurityGroup> security_group_lookup = group_id ->
+            client.describeSecurityGroups(
+                DescribeSecurityGroupsRequest.builder()
+                    .groupIds(group_id)
+                    .build()
+            ).securityGroups().get(0);
+
         return client.describeInstancesPaginator().stream()
             .flatMap( r -> r.reservations().stream() )
             .flatMap( r -> r.instances().stream() )
 //            .peek( System.out::println )
             .parallel()                     // parallel due to pricing lookups in buildInstanceInfo
-            .map( i -> buildInstanceInfo( i, region, pricing ) )
+            .map( i -> buildInstanceInfo(
+                i,
+                region,
+                pricing,
+                security_group_map,
+                security_group_lookup
+            ) )
             .collect( Collectors.toUnmodifiableMap( InstanceInfo::id, identity() ) );
     }
 
@@ -94,13 +109,29 @@ public class ScanFunctions {
     }
 
 
+    public static Map<String,CFDistributionInfo> scanCloudfrontDistributions(CloudFrontClient client) {
+        ListDistributionsResponse response = client.listDistributions();
+        return response.distributionList().items().stream()
+            .map( d -> new CFDistributionInfo(
+                d.id(),
+                d.domainName(),
+                d.comment(),
+                d.enabled(),
+                d.aliases().items()
+            ))
+            .collect(Collectors.toUnmodifiableMap( CFDistributionInfo::id, identity() ) );
+    }
+
+
     private static Map<String,String> ec2TagListToMap( List<Tag> list ) {
         return list.stream().collect( Collectors.toUnmodifiableMap(
             Tag::key, Tag::value ) );
     }
 
 
-    private static InstanceInfo buildInstanceInfo( Instance i, String region, PricingEstimation pricing ) {
+    private static InstanceInfo buildInstanceInfo( Instance i, String region, PricingEstimation pricing,
+                                                   Map<String,SecurityGroup> security_group_map,
+                                                   Function<String,SecurityGroup> security_group_lookup) {
 
         EC2PriceAttributes price_attributes = new EC2PriceAttributes( region,
             i.instanceTypeAsString(), platformToOS( i.platformDetails() ),
@@ -118,6 +149,9 @@ public class ScanFunctions {
                 i.publicIpAddress(),
                 i.subnetId(),
                 i.vpcId(),
+                i.securityGroups().stream()
+                    .map(id -> security_group_map.computeIfAbsent(id.groupId(), security_group_lookup))
+                    .collect(Collectors.toUnmodifiableMap(SecurityGroup::groupId, Function.identity())),
                 i.architectureAsString(),
                 i.platformAsString(),
                 i.capacityReservationId(),

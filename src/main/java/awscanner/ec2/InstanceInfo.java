@@ -1,16 +1,14 @@
 package awscanner.ec2;
 
-import awscanner.price.PriceResults;
 import awscanner.price.ResourceWithPrice;
 import awscanner.util.ResourceInfo;
+import software.amazon.awssdk.services.ec2.model.GroupIdentifier;
 import software.amazon.awssdk.services.ec2.model.LicenseConfiguration;
+import software.amazon.awssdk.services.ec2.model.SecurityGroup;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Stream;
 
 
@@ -23,6 +21,7 @@ public record InstanceInfo(String id,
                            String public_ip,
                            String subnet_id,
                            String vpc_id,
+                           Map<String,SecurityGroup> security_groups,
                            String arch,
                            String platform,
                            String reservation_id,
