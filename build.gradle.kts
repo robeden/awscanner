@@ -42,7 +42,7 @@ dependencies {
     implementation("org.jgrapht:jgrapht-core:1.5.2")    // Graph
     implementation("org.jgrapht:jgrapht-io:1.5.2")      // Graph
     constraints {
-        implementation("org.apache.commons:commons-text:1.10") {
+        implementation("org.apache.commons:commons-text:1.11.0") {
             because("version 1.8 pulled from jgraph-io has CVE-2022-42889")
         }
     }
