@@ -51,12 +51,19 @@ public class UnusedSnapshots {
                     .collect( Collectors.joining( "," ) ) + ")";
             }
 
+            String delete_file_reason = null;
             if ( snapshot.tags().isEmpty() && snapshot.days_since_creation() > 31 ) {
                 if ( config.delete_obvious() ) {
                     writer.print( "❌" );
-                    client.deleteSnapshot( DeleteSnapshotRequest.builder()
-                        .snapshotId( snapshot.id() )
-                        .build() );
+                    try {
+                        client.deleteSnapshot(DeleteSnapshotRequest.builder()
+                            .snapshotId(snapshot.id())
+                            .build());
+                    }
+                    catch(Exception ex) {
+                        delete_file_reason = ex.toString();
+                        writer.print( "⚠️DELETE FAILED: " + delete_file_reason + "⚠️" );
+                    }
                 }
                 else {
                     writer.print( "❗️" );
