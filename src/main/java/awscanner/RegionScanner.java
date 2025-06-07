@@ -2,6 +2,7 @@ package awscanner;
 
 import awscanner.ec2.*;
 import awscanner.efs.EFSInfo;
+import awscanner.lambda.LambdaInfo;
 import awscanner.price.PricingEstimation;
 import awscanner.rds.DBInstanceInfo;
 import awscanner.route53.ZoneInfo;
@@ -10,6 +11,7 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.cloudfront.CloudFrontClient;
 import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.efs.EfsClient;
+import software.amazon.awssdk.services.lambda.LambdaClient;
 import software.amazon.awssdk.services.pricing.PricingClient;
 import software.amazon.awssdk.services.rds.RdsClient;
 import software.amazon.awssdk.services.route53.Route53Client;
@@ -22,6 +24,7 @@ import java.util.concurrent.Future;
 
 import static awscanner.ec2.ScanFunctions.*;
 import static awscanner.efs.ScanFunctions.scanFileSystems;
+import static awscanner.lambda.ScanFunctions.scanLambdaFunctions;
 import static awscanner.rds.ScanFunctions.scanRdsInstances;
 import static awscanner.route53.ScanFunctions.scanZones;
 
@@ -31,6 +34,7 @@ public class RegionScanner implements Callable<RegionInfo> {
     private final CloudFrontClient cf_client;
     private final Ec2Client ec2_client;
     private final EfsClient efs_client;
+    private final LambdaClient lambda_client;
     private final PricingClient pricing_client;
     private final RdsClient rds_client;
     private final Route53Client route53_client;
@@ -52,6 +56,10 @@ public class RegionScanner implements Callable<RegionInfo> {
             .credentialsProvider( creds )
             .build();
         efs_client = EfsClient.builder()
+            .region( region )
+            .credentialsProvider( creds )
+            .build();
+        lambda_client = LambdaClient.builder()
             .region( region )
             .credentialsProvider( creds )
             .build();
@@ -84,11 +92,12 @@ public class RegionScanner implements Callable<RegionInfo> {
         PricingEstimation pricing = new PricingEstimation( executor, pricing_client );
 
         Future<Map<String, CFDistributionInfo>> cloudfront_future = emptyFuture();
-        Future<Map<String,InstanceInfo>> instance_future = emptyFuture();
-        Future<Map<String,ImageInfo>> image_future = emptyFuture();
-        Future<Map<String,SnapshotInfo>> snapshot_future = emptyFuture();
-        Future<Map<String,EBSInfo>> volume_future = emptyFuture();
-        Future<Map<String,EFSInfo>> efs_future = emptyFuture();
+        Future<Map<String, InstanceInfo>> instance_future = emptyFuture();
+        Future<Map<String, ImageInfo>> image_future = emptyFuture();
+        Future<Map<String, LambdaInfo>> lambda_future = emptyFuture();
+        Future<Map<String, SnapshotInfo>> snapshot_future = emptyFuture();
+        Future<Map<String, EBSInfo>> volume_future = emptyFuture();
+        Future<Map<String, EFSInfo>> efs_future = emptyFuture();
         Future<Map<String, DBInstanceInfo>> rds_future = emptyFuture();
         Future<Map<String, ZoneInfo>> route53_zone_future = emptyFuture();
 
@@ -105,6 +114,8 @@ public class RegionScanner implements Callable<RegionInfo> {
                 executor.submit( () -> scanEc2Instances( ec2_client, region.id(), pricing ) );
             image_future =
                 executor.submit( () -> scanImages( owner_id, ec2_client ) );
+            lambda_future =
+                executor.submit( () -> scanLambdaFunctions( lambda_client ) );
             snapshot_future =
                 executor.submit( () -> scanSnapshots( owner_id, ec2_client ) );
             volume_future =
@@ -129,6 +140,7 @@ public class RegionScanner implements Callable<RegionInfo> {
             rds_future.get(),
             route53_zone_future.get(),
             cloudfront_future.get(),
+            lambda_future.get(),
             owner_id,
             !pricing.disabled() );
     }

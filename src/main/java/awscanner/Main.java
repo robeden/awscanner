@@ -12,6 +12,7 @@ import awscanner.ec2.InstanceInfo;
 import awscanner.ec2.SnapshotInfo;
 import awscanner.efs.EFSInfo;
 import awscanner.graph.ResourceGraph;
+import awscanner.lambda.LambdaInfo;
 import awscanner.report.OwnerReport;
 import awscanner.route53.ZoneInfo;
 import picocli.CommandLine;
@@ -212,6 +213,14 @@ public class Main implements Callable<Integer> {
                     color = ColorWriter.Color.YELLOW;
                 }
                 writer.println( "  " + efs, color );
+            }
+            for(LambdaInfo lambda : region_info.lambda_functions().values() ) {
+                ColorWriter.Color color = switch(lambda.getRuntimeStatus()) {
+                    case DEPRECATED -> ColorWriter.Color.RED;
+                    case DEPRECATED_SOON -> ColorWriter.Color.YELLOW;
+                    default -> ColorWriter.Color.NONE;
+                };
+                writer.println( "  " + lambda, color );
             }
             for ( ZoneInfo zone : region_info.route53_zones().values() ) {
                 ColorWriter.Color color = ColorWriter.NONE;

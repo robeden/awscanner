@@ -2,6 +2,7 @@ package awscanner;
 
 import awscanner.ec2.*;
 import awscanner.efs.EFSInfo;
+import awscanner.lambda.LambdaInfo;
 import awscanner.rds.DBInstanceInfo;
 import awscanner.route53.ZoneInfo;
 import software.amazon.awssdk.regions.Region;
@@ -18,6 +19,7 @@ public record RegionInfo(Region region,
                          Map<String,DBInstanceInfo> rds_instances,
                          Map<String, ZoneInfo> route53_zones,
                          Map<String, CFDistributionInfo> cf_dists,
+                         Map<String, LambdaInfo> lambda_functions,
                          String ownerId,
                          boolean pricing_enabled) {
 }
